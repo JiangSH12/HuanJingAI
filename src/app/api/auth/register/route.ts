@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 // Admin invitation code — set via env variable or fallback
-const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE || 'miaojing-admin-2024';
+const ADMIN_INVITE_CODE = process.env.ADMIN_INVITE_CODE || 'huanjing-admin-2026';
 
 export async function POST(request: NextRequest) {
   try {

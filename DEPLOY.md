@@ -98,24 +98,54 @@ npm install -g pnpm
 
 ---
 
-## 5. Supabase 配置
+## 5. Coze SDK 配置（内置模型）
 
-### 5.1 创建 Supabase 项目
+### 5.1 获取 Coze API 凭证
+
+1. 访问 [Coze 开发者平台](https://www.coze.com/)
+2. 登录后进入个人设置或开发者设置
+3. 获取 API 密钥（Workload Identity API Key）
+4. 记录以下信息：
+   - **API Key** → 对应 `COZE_API_KEY`
+   - API 地址：`https://api.coze.com`（`COZE_API_BASE_URL`）
+   - 模型地址：`https://model.coze.com`（`COZE_MODEL_BASE_URL`）
+
+### 5.2 配置环境变量
+
+```bash
+COZE_API_KEY=your_api_key_here
+COZE_API_BASE_URL=https://api.coze.com
+COZE_MODEL_BASE_URL=https://model.coze.com
+```
+
+### 5.3 使用方式
+
+| 模式 | 说明 | 是否消耗积分 |
+|------|------|-------------|
+| **内置模型（默认）** | 使用 coze-coding-dev-sdk + 豆包模型 | ✅ 消耗平台积分 |
+| 自定义 API | 用户配置自己的 API 密钥 | ❌ 不消耗积分 |
+| 系统模型 | 管理员配置的系统默认 API | ✅ 按管理员配置消耗 |
+
+---
+
+## 6. Supabase 配置
+
+### 6.1 创建 Supabase 项目
 
 1. 访问 [https://supabase.com](https://supabase.com) 注册并登录
 2. 点击「New Project」，选择组织、填写项目名称和数据库密码
 3. 选择离用户最近的区域，点击「Create new project」
 4. 等待项目初始化完成（约 2 分钟）
 
-### 5.2 获取 API 密钥
+### 6.2 获取 API 密钥
 
 1. 进入项目 Dashboard → Settings → API
 2. 记录以下信息：
-   - **Project URL** → 对应 `COZE_SUPABASE_URL`
-   - **anon public** key → 对应 `COZE_SUPABASE_ANON_KEY`
-   - **service_role** key → 对应 `COZE_SUPABASE_SERVICE_ROLE_KEY`（⚠️ 保密！）
+   - **Project URL** → 对应 `SUPABASE_URL`
+   - **anon public** key → 对应 `SUPABASE_ANON_KEY`
+   - **service_role** key → 对应 `SUPABASE_SERVICE_ROLE_KEY`（⚠️ 保密！）
 
-### 5.3 初始化数据库
+### 6.3 初始化数据库
 
 1. 进入项目 Dashboard → SQL Editor
 2. 点击「New query」
@@ -167,9 +197,9 @@ cp .env.example .env.local
 编辑 `.env.local`，填写 Supabase 配置：
 
 ```env
-COZE_SUPABASE_URL=https://xxxxx.supabase.co
-COZE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
-COZE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
+SUPABASE_URL=https://xxxxx.supabase.co
+SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs...
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs...
 ```
 
 #### 步骤 3: 安装依赖
@@ -261,9 +291,9 @@ docker build -t miaojing:latest .
 docker run -d \
   --name miaojing \
   -p 5000:5000 \
-  -e COZE_SUPABASE_URL=https://xxxxx.supabase.co \
-  -e COZE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs... \
-  -e COZE_SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs... \
+  -e SUPABASE_URL=https://xxxxx.supabase.co \
+  -e SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs... \
+  -e SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs... \
   --restart unless-stopped \
   miaojing:latest
 ```
@@ -452,7 +482,7 @@ pnpm build
 
 说明 Supabase 环境变量未正确配置。检查：
 1. `.env.local` 文件是否存在
-2. `COZE_SUPABASE_URL` 等变量是否填写正确
+2. `SUPABASE_URL` 等变量是否填写正确
 3. 重启服务使环境变量生效
 
 ### Q: AI 生成报网络错误

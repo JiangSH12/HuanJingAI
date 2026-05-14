@@ -7,7 +7,7 @@ export async function GET() {
   try {
     supabase = getSupabaseClient();
   } catch {
-    return NextResponse.json({ error: '数据库未配置，无法获取订单列表。请配置 COZE_SUPABASE_URL 等环境变量。' }, { status: 503 });
+    return NextResponse.json({ error: '数据库未配置，无法获取订单列表。请配置 SUPABASE_URL 等环境变量。' }, { status: 503 });
   }
 
   const { data, error } = await supabase

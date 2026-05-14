@@ -16,6 +16,7 @@ import {
   IMG2IMG_STYLE_PRESETS,
   isCustomModel,
   isSystemModel,
+  isSiliconFlowDefault,
   getCustomKeyId,
   getSystemApiId,
   buildCustomModelId,
@@ -75,8 +76,9 @@ export function ImageToImagePanel() {
   const systemImageApis = adminConfig.systemApis.filter(api => api.type === 'image' && api.isActive);
   const systemTextApis = adminConfig.systemApis.filter(api => api.type === 'text' && api.isActive);
 
-  // Model options — only system + custom (no builtin)
+  // Model options — include siliconflow default + system + custom
   const modelOptions = useMemo(() => [
+    { id: 'siliconflow-default', label: '通义图像 (默认)', group: '默认模型' },
     ...systemImageApis.map(api => ({ id: buildSystemModelId(api.id), label: `${api.name} (系统)`, group: '系统模型' })),
     ...imageKeys.map(k => ({ id: buildCustomModelId(k.id), label: `${k.modelName || k.provider} (自定义)`, group: '自定义模型' })),
   ], [systemImageApis, imageKeys]);
@@ -98,6 +100,7 @@ export function ImageToImagePanel() {
   ], [textKeys, systemTextApis]);
 
   const getCurrentModelLabel = useCallback(() => {
+    if (selectedModel === 'siliconflow-default') return '硅基流动';
     if (isCustomModel(selectedModel)) {
       const key = imageKeys.find(k => k.id === getCustomKeyId(selectedModel));
       return key?.modelName || key?.provider || '自定义模型';
@@ -175,8 +178,8 @@ export function ImageToImagePanel() {
     try {
       // Send first reference image as primary, others as additional context
       const primaryImage = refImages[0].dataUrl;
-      // Use API-compatible sizes for custom/system models, high-res for SDK models
-      const useCustomApiSize = isCustomModel(selectedModel) || isSystemModel(selectedModel);
+      // Use API-compatible sizes for custom/system/siliconflow models
+      const useCustomApiSize = isCustomModel(selectedModel) || isSystemModel(selectedModel) || isSiliconFlowDefault(selectedModel);
       const resolvedSize = aspectRatio === 'original'
         ? undefined
         : useCustomApiSize
@@ -208,6 +211,7 @@ export function ImageToImagePanel() {
           requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey } };
         }
       }
+      // siliconflow-default 不传 customApiConfig，让后端使用默认配置
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 180_000);
@@ -234,7 +238,7 @@ export function ImageToImagePanel() {
             negativePrompt: negativePrompt.trim() || undefined,
             model: selectedModel,
             modelLabel: getCurrentModelLabel(),
-            isCustomModel: isCustomModel(selectedModel) || isSystemModel(selectedModel),
+            isCustomModel: isCustomModel(selectedModel) || isSystemModel(selectedModel) || isSiliconFlowDefault(selectedModel),
             params: { aspectRatio, resolution, count, strength, refImageCount: refImages.length },
           });
         }

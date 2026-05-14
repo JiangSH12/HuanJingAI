@@ -7,6 +7,8 @@
  *
  * 视频生成参数：
  * - 画面比例 + 时长 + 帧率
+ *
+ * 默认使用硅基流动 API，通过环境变量配置
  */
 
 // ---- 图片生成模型 ----
@@ -18,30 +20,13 @@ export interface ImageModelConfig {
   description: string;
 }
 
+// 默认使用硅基流动图片模型
 export const IMAGE_MODELS: ImageModelConfig[] = [
   {
-    id: 'doubao-seedream-5-0-260128',
-    label: 'See Dream v5.0',
-    provider: '字节跳动',
-    description: '最新一代，画质与创意全面升级',
-  },
-  {
-    id: 'doubao-seedream-4-5-251128',
-    label: 'See Dream v4.5',
-    provider: '字节跳动',
-    description: '高质量通用图片生成',
-  },
-  {
-    id: 'doubao-seedream-3-5-250528',
-    label: 'See Dream v3.5',
-    provider: '字节跳动',
-    description: '均衡性价比之选',
-  },
-  {
-    id: 'minimax-image-01',
-    label: '香蕉图片',
-    provider: 'MiniMax',
-    description: '风格多样，创意表现力强',
+    id: 'siliconflow-default',
+    label: '通义图像 (Z-Image-Turbo)',
+    provider: '硅基流动',
+    description: '通义图像Turbo模型，支持多种风格',
   },
 ];
 
@@ -126,18 +111,13 @@ export interface VideoModelConfig {
   description: string;
 }
 
+// 默认使用硅基流动视频模型
 export const VIDEO_MODELS: VideoModelConfig[] = [
   {
-    id: 'doubao-seedance-1-5-pro-251215',
-    label: 'SeeDance Pro',
-    provider: '字节跳动',
-    description: '专业视频生成，画质与流畅度兼优',
-  },
-  {
-    id: 'doubao-seedance-1-0-lite-250428',
-    label: 'SeeDance Lite',
-    provider: '字节跳动',
-    description: '轻量快速，适合短片段生成',
+    id: 'siliconflow-default',
+    label: '万梦视频 (Wan2.2-I2V)',
+    provider: '硅基流动',
+    description: '万梦视频模型，支持文生视频和图生视频',
   },
 ];
 
@@ -183,9 +163,15 @@ export function getImageModelConfig(modelId: string): ImageModelConfig | undefin
   return IMAGE_MODELS.find(m => m.id === modelId);
 }
 
-// 辅助：计算积分消耗（自定义模型不消耗积分，系统模型按管理员配置消耗）
+// 判断是否为硅基流动默认模型
+export function isSiliconFlowDefault(modelId: string): boolean {
+  return modelId === 'siliconflow-default';
+}
+
+// 辅助：计算积分消耗（硅基流动/自定义模型不消耗积分，系统模型按管理员配置消耗）
 export function calcImageCredits(modelId: string, resolution?: string, aspectRatio?: string, count: number = 1, systemCreditsPerUse?: number): number {
   if (isCustomModel(modelId)) return 0;
+  if (isSiliconFlowDefault(modelId)) return 0; // 硅基流动默认不消耗积分
   if (isSystemModel(modelId) && systemCreditsPerUse !== undefined) return systemCreditsPerUse * count;
   // Resolution credits
   const r = RESOLUTION_OPTIONS.find(o => o.value === resolution);
@@ -194,6 +180,7 @@ export function calcImageCredits(modelId: string, resolution?: string, aspectRat
 
 export function calcVideoCredits(duration: string, modelId?: string, systemCreditsPerUse?: number): number {
   if (modelId && isCustomModel(modelId)) return 0;
+  if (modelId && isSiliconFlowDefault(modelId)) return 0; // 硅基流动默认不消耗积分
   if (modelId && isSystemModel(modelId) && systemCreditsPerUse !== undefined) return systemCreditsPerUse;
   const d = VIDEO_DURATIONS.find(o => o.value === duration);
   return d?.credits ?? 20;

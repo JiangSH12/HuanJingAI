@@ -12,8 +12,8 @@
 - **UI 组件**: shadcn/ui (基于 Radix UI)
 - **Styling**: Tailwind CSS 4
 - **Database**: Supabase (PostgreSQL + Auth + Storage)
-- **AI SDK**: coze-coding-dev-sdk
-- **Object Storage**: S3 兼容对象存储 (coze-coding-dev-sdk S3Storage)
+- **AI 模型**: 硅基流动 (SiliconFlow) - 默认图片/视频生成
+- **Object Storage**: AWS S3 兼容对象存储
 
 ## 目录结构
 
@@ -98,16 +98,18 @@
 
 | 变量名 | 必填 | 说明 |
 |--------|------|------|
-| `COZE_SUPABASE_URL` | 推荐 | Supabase 项目 URL，不配置则运行 Demo 模式 |
-| `COZE_SUPABASE_ANON_KEY` | 推荐 | Supabase anon key |
-| `COZE_SUPABASE_SERVICE_ROLE_KEY` | 推荐 | Supabase service role key（服务端操作） |
-| `ADMIN_INVITE_CODE` | 可选 | 管理员注册邀请码，默认 `miaojing-admin-2024` |
+| `SUPABASE_URL` | 推荐 | Supabase 项目 URL，不配置则运行 Demo 模式 |
+| `SUPABASE_ANON_KEY` | 推荐 | Supabase anon key |
+| `SUPABASE_SERVICE_ROLE_KEY` | 推荐 | Supabase service role key（服务端操作） |
+| `SILICONFLOW_API_KEY` | 必填 | 硅基流动 API 密钥（图片/视频生成） |
+| `SILICONFLOW_API_URL` | 可选 | 硅基流动 API 地址，默认 `https://api.siliconflow.cn/v1` |
+| `SILICONFLOW_IMAGE_MODEL` | 可选 | 图片模型，默认 `stabilityai/stable-diffusion-3-medium-native` |
+| `SILICONFLOW_VIDEO_MODEL` | 可选 | 视频模型，默认 `tencent/hunyuan-video` |
+| `ADMIN_INVITE_CODE` | 可选 | 管理员注册邀请码，默认 `huanjing-admin-2026` |
 | `ADMIN_DEFAULT_PASSWORD` | 可选 | 默认管理员账号密码，默认 `admin123` |
-| `COZE_PROJECT_ENV` | 可选 | DEV/PROD |
+| `APP_ENV` | 可选 | DEV/PROD |
 | `DEPLOY_RUN_PORT` | 可选 | 服务端口，默认 5000 |
-| `COZE_PROJECT_DOMAIN_DEFAULT` | 可选 | 对外域名 |
-
-也支持不带 `COZE_` 前缀的变量名（`SUPABASE_URL` 等），优先使用 `COZE_` 前缀。
+| `APP_DOMAIN` | 可选 | 对外域名 |
 
 ## 数据库 Schema
 
@@ -153,7 +155,7 @@
 - 颜色必须使用 Tailwind 语义化变量 (`bg-primary`, `text-muted-foreground` 等)
 - 禁止硬编码颜色值和 Tailwind 原生色盘
 - 禁止隐式 `any`
-- AI SDK (coze-coding-dev-sdk) 仅在服务端使用
+- AI 模型使用硅基流动 API，通过环境变量配置
 - Supabase 未配置时，所有 API 自动降级为 Demo 模式
 
 ### Supabase 客户端
@@ -161,7 +163,7 @@
 - 统一入口：`getSupabaseClient(token?)` — `src/storage/database/supabase-client.ts`
 - 无 token 时使用 service role key（管理员权限），有 token 时使用 anon key + Authorization
 - 未配置时 throw Error，调用方 try/catch 降级为 Demo 模式
-- 环境变量支持 `COZE_` 前缀和裸名两种格式
+
 
 ### S3 媒体持久化
 
@@ -204,7 +206,7 @@
 ### 创作参数系统
 
 - 图片生成参数：画面比例（1:1/16:9/9:16/4:3/3:4）+ 分辨率（1080P/2K/4K）
-- `resolveImageSize(aspectRatio, resolution)` — SDK 内置模型使用高清像素尺寸
+- `resolveImageSize(aspectRatio, resolution)` — 内置模型使用高清像素尺寸
 - `resolveCustomApiImageSize(aspectRatio)` — 自定义 API 使用常用标准尺寸
 - `getAspectRatioPromptHint(aspectRatio)` — 提示词增强，嵌入画面比例描述
 - 图生图额外支持「原比例」选项

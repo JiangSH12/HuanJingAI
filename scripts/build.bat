@@ -1,9 +1,9 @@
 @echo off
 setlocal
 
-set "COZE_WORKSPACE_PATH=%CD%"
+set "WORKSPACE_PATH=%CD%"
 
-cd /d "%COZE_WORKSPACE_PATH%"
+cd /d "%WORKSPACE_PATH%"
 
 echo Installing dependencies...
 pnpm install --prefer-frozen-lockfile --prefer-offline

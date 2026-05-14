@@ -14,6 +14,7 @@ import {
   IMG2VIDEO_CAMERA_MOVEMENTS,
   isCustomModel,
   isSystemModel,
+  isSiliconFlowDefault,
   getCustomKeyId,
   getSystemApiId,
   buildCustomModelId,
@@ -56,8 +57,9 @@ export function ImageToVideoPanel() {
   const systemVideoApis = adminConfig.systemApis.filter(api => api.type === 'video' && api.isActive);
   const systemTextApis = adminConfig.systemApis.filter(api => api.type === 'text' && api.isActive);
 
-  // Model options — only system + custom (no builtin)
+  // Model options — include siliconflow default + system + custom
   const modelOptions = useMemo(() => [
+    { id: 'siliconflow-default', label: '万梦视频 (默认)', group: '默认模型' },
     ...systemVideoApis.map(api => ({ id: buildSystemModelId(api.id), label: `${api.name} (系统)`, group: '系统模型' })),
     ...videoKeys.map(k => ({ id: buildCustomModelId(k.id), label: `${k.modelName || k.provider} (自定义)`, group: '自定义模型' })),
   ], [systemVideoApis, videoKeys]);
@@ -78,6 +80,7 @@ export function ImageToVideoPanel() {
   ], [textKeys, systemTextApis]);
 
   const getCurrentModelLabel = useCallback(() => {
+    if (selectedModel === 'siliconflow-default') return '硅基流动';
     if (isCustomModel(selectedModel)) {
       const key = videoKeys.find(k => k.id === getCustomKeyId(selectedModel));
       return key?.modelName || key?.provider || '自定义模型';
@@ -163,6 +166,7 @@ export function ImageToVideoPanel() {
           requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey } };
         }
       }
+      // siliconflow-default 不传 customApiConfig，让后端使用默认配置
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 240_000);
@@ -189,7 +193,7 @@ export function ImageToVideoPanel() {
             negativePrompt: negativePrompt.trim() || undefined,
             model: selectedModel,
             modelLabel: getCurrentModelLabel(),
-            isCustomModel: isCustomModel(selectedModel) || isSystemModel(selectedModel),
+            isCustomModel: isCustomModel(selectedModel) || isSystemModel(selectedModel) || isSiliconFlowDefault(selectedModel),
             params: { aspectRatio, duration, cameraMovement },
           });
         }

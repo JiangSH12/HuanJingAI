@@ -4,11 +4,11 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
  * Supabase client for the MiaoJing AI Creation Platform.
  *
  * Required environment variables:
- * - COZE_SUPABASE_URL: Supabase project URL
- * - COZE_SUPABASE_ANON_KEY: Supabase anon/public key
- * - COZE_SUPABASE_SERVICE_ROLE_KEY: Supabase service role key (optional, for admin operations)
+ * - SUPABASE_URL: Supabase project URL
+ * - SUPABASE_ANON_KEY: Supabase anon/public key
+ * - SUPABASE_SERVICE_ROLE_KEY: Supabase service role key (optional, for admin operations)
  *
- * If COZE_SUPABASE_URL is not set, getSupabaseClient() will throw,
+ * If SUPABASE_URL is not set, getSupabaseClient() will throw,
  * and callers should fall back to demo mode.
  */
 
@@ -27,21 +27,21 @@ function loadDotenv(): void {
 
 function getSupabaseUrl(): string {
   loadDotenv();
-  const url = process.env.COZE_SUPABASE_URL || process.env.SUPABASE_URL;
-  if (!url) throw new Error('COZE_SUPABASE_URL is not set');
+  const url = process.env.SUPABASE_URL;
+  if (!url) throw new Error('SUPABASE_URL is not set');
   return url;
 }
 
 function getSupabaseAnonKey(): string {
   loadDotenv();
-  const key = process.env.COZE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY;
-  if (!key) throw new Error('COZE_SUPABASE_ANON_KEY is not set');
+  const key = process.env.SUPABASE_ANON_KEY;
+  if (!key) throw new Error('SUPABASE_ANON_KEY is not set');
   return key;
 }
 
 function getSupabaseServiceRoleKey(): string | undefined {
   loadDotenv();
-  return process.env.COZE_SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY;
+  return process.env.SUPABASE_SERVICE_ROLE_KEY;
 }
 
 /**
@@ -50,7 +50,7 @@ function getSupabaseServiceRoleKey(): string | undefined {
  * @param token - Optional user JWT token for authenticated requests.
  *                When provided, uses anon key + Authorization header.
  *                When omitted, uses service role key (if available) or anon key.
- * @throws Error if COZE_SUPABASE_URL is not configured.
+ * @throws Error if SUPABASE_URL is not configured.
  */
 function getSupabaseClient(token?: string): SupabaseClient {
   const url = getSupabaseUrl();
