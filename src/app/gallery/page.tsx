@@ -321,13 +321,23 @@ export default function GalleryPage() {
                       onDoubleClick={(e) => { e.stopPropagation(); setFullscreenSrc(work.url); }}
                     />
                   ) : work.url && !work.url.startsWith('data:') ? (
-                    <img
-                      src={work.url}
-                      alt={(work.prompt || '').slice(0, 30)}
-                      className="w-full h-full object-cover"
-                      loading="lazy"
-                      onDoubleClick={(e) => { e.stopPropagation(); setFullscreenSrc(work.url); }}
-                    />
+                    (work.type === 'video' || work.type === 'text2video' || work.type === 'img2video') ? (
+                      <video
+                        src={work.url}
+                        muted
+                        preload="metadata"
+                        className="w-full h-full object-cover"
+                        onDoubleClick={(e) => { e.stopPropagation(); setFullscreenSrc(work.url); }}
+                      />
+                    ) : (
+                      <img
+                        src={work.url}
+                        alt={(work.prompt || '').slice(0, 30)}
+                        className="w-full h-full object-cover"
+                        loading="lazy"
+                        onDoubleClick={(e) => { e.stopPropagation(); setFullscreenSrc(work.url); }}
+                      />
+                    )
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
                       <Sparkles className="h-6 w-6 text-muted-foreground/15" />

@@ -3,7 +3,7 @@ import { S3Storage } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { buildCustomApiHeaders, fetchWithRetry, parseCustomApiError } from '@/lib/custom-api-fetch';
 import { getAspectRatioPromptHint } from '@/lib/model-config';
-import { getAdapter } from '@/lib/api-adapters';
+import { getAdapter, buildDashScopeVideoSynthesisUrl, buildDashScopePollUrl, extractVideoTaskId, extractVideoTaskStatus } from '@/lib/api-adapters';
 import type { VideoAdapterParams } from '@/lib/api-adapters/types';
 
 // 硅基流动默认配置
@@ -142,13 +142,30 @@ export async function POST(request: NextRequest) {
 
         const requestBody = adapter.buildVideoRequest(params);
 
-        console.log('[Custom API Video] format:', customApiConfig.apiFormat || 'openai', '| model:', customApiConfig.modelName);
+        // 确定请求 URL（dashscope 格式使用专用视频端点）
+        let requestUrl = customApiConfig.apiUrl;
+        if (customApiConfig.apiFormat === 'dashscope') {
+          requestUrl = buildDashScopeVideoSynthesisUrl(customApiConfig.apiUrl);
+        }
+
+        // 构建请求头
+        const headers: Record<string, string> = {
+          'Content-Type': 'application/json',
+        };
+
+        // dashscope 格式需要 X-DashScope-Async 头
+        if (customApiConfig.apiFormat === 'dashscope') {
+          headers['X-DashScope-Async'] = 'enable';
+          headers['Authorization'] = `Bearer ${customApiConfig.apiKey}`;
+        } else {
+          Object.assign(headers, buildCustomApiHeaders(customApiConfig.apiKey, customApiConfig.apiFormat));
+        }
 
         let customResponse: Response;
         try {
           customResponse = await fetchWithRetry(
-            customApiConfig.apiUrl,
-            { method: 'POST', headers: buildCustomApiHeaders(customApiConfig.apiKey, customApiConfig.apiFormat), body: JSON.stringify(requestBody) },
+            requestUrl,
+            { method: 'POST', headers, body: JSON.stringify(requestBody) },
             GENERATION_TIMEOUT,
             1,
           );
@@ -166,6 +183,174 @@ export async function POST(request: NextRequest) {
         }
 
         const customData = await customResponse.json();
+        console.log('[Custom API Video] Raw response:', JSON.stringify(customData).slice(0, 500));
+
+        // 检测异步任务响应（task_id + task_status）
+        const responseTaskId = (customData as Record<string, unknown>).task_id as string ||
+          ((customData as Record<string, unknown>).output as Record<string, unknown>)?.task_id as string;
+        const responseTaskStatus = (customData as Record<string, unknown>).task_status as string ||
+          ((customData as Record<string, unknown>).output as Record<string, unknown>)?.task_status as string;
+        // 有些API使用 request_id 作为轮询标识
+        const responseRequestId = (customData as Record<string, unknown>).request_id as string;
+
+        console.log('[Custom API Video] Parsed ids - taskId:', responseTaskId, 'status:', responseTaskStatus, 'requestId:', responseRequestId);
+
+        // dashscope 异步模式：轮询获取结果
+        if (customApiConfig.apiFormat === 'dashscope') {
+          const taskId = extractVideoTaskId(customData);
+          if (taskId) {
+            // 异步模式：轮询获取结果
+            const pollUrl = buildDashScopePollUrl(customApiConfig.apiUrl, taskId);
+
+            const maxRetries = 120; // 最多等待 10 分钟
+            // 动态轮询间隔：前30秒每2秒一次，之后每5秒一次
+            const getPollInterval = (i: number) => i < 15 ? 2000 : 5000;
+
+            console.log(`[Custom API Video] Starting dashscope polling, URL: ${pollUrl}, taskId: ${taskId}`);
+
+            for (let i = 0; i < maxRetries; i++) {
+              await new Promise(resolve => setTimeout(resolve, getPollInterval(i)));
+
+              try {
+                const pollResponse = await fetch(pollUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${customApiConfig.apiKey}`,
+                  },
+                });
+
+                if (!pollResponse.ok) {
+                  console.log(`[Custom API Video] Poll ${i + 1} failed: ${pollResponse.status}`);
+                  continue;
+                }
+
+                const pollData = await pollResponse.json();
+                const { status, videoUrl, error } = extractVideoTaskStatus(pollData);
+
+                if (status === 'succeeded') {
+                  if (videoUrl) {
+                    console.log(`[Custom API Video] Success!`);
+                    const videos = [videoUrl];
+                    const persistedVideos = await persistAllMediaUrls(videos, 'generated/videos');
+                    return NextResponse.json({ videos: persistedVideos });
+                  }
+                }
+
+                if (status === 'failed') {
+                  console.log(`[Custom API Video] Failed: ${error}`);
+                  return NextResponse.json({ error: error || '视频生成失败' }, { status: 500 });
+                }
+
+                // 每10次打印一次进度
+                if (i % 10 === 0) {
+                  console.log(`[Custom API Video] Poll ${i + 1}, status: ${status}`);
+                }
+              } catch {
+                // 静默处理网络错误
+              }
+            }
+
+            return NextResponse.json({ error: '视频生成超时，请稍后重试' }, { status: 504 });
+          }
+        }
+
+        // 通用异步模式：响应包含 task_id 且状态为 PENDING/PROCESSING
+        if (responseTaskId && responseTaskStatus &&
+            ['PENDING', 'PROCESSING', 'SUBMITTED', 'RUNNING'].includes(responseTaskStatus)) {
+          // 构建轮询 URL：尝试多个常见端点格式
+          const baseUrl = customApiConfig.apiUrl.replace(/\/$/, '');
+
+          // 同时尝试 task_id 和 request_id 两种标识
+          const ids = [responseTaskId];
+          if (responseRequestId) ids.push(responseRequestId);
+
+          const pollEndpoints: string[] = [];
+          for (const id of ids) {
+            pollEndpoints.push(
+              `${baseUrl}/tasks/${id}`,
+              `${baseUrl}/task/${id}`,
+              `${baseUrl}/jobs/${id}`,
+              `${baseUrl}/async/task/${id}`,
+              `${baseUrl}/requests/${id}`,
+              `${baseUrl}/async/result/${id}`,
+              `${baseUrl}/video/task/${id}`,
+              `${baseUrl}/video/result/${id}`,
+            );
+          }
+
+          const maxRetries = 360; // 最多等待 30 分钟
+          // 动态轮询间隔：前30秒每2秒一次，之后每5秒一次
+          const getPollInterval = (i: number) => i < 15 ? 2000 : 5000;
+
+          console.log(`[Custom API Video] Async mode detected, task_id: ${responseTaskId}, request_id: ${responseRequestId}`);
+
+          let lastPollData: Record<string, unknown> | null = null;
+
+          for (let i = 0; i < maxRetries; i++) {
+            await new Promise(resolve => setTimeout(resolve, getPollInterval(i)));
+
+            // 尝试所有可能的端点
+            for (const pollUrl of pollEndpoints) {
+              try {
+                const pollResponse = await fetch(pollUrl, {
+                  method: 'GET',
+                  headers: buildCustomApiHeaders(customApiConfig.apiKey, customApiConfig.apiFormat),
+                });
+
+                if (!pollResponse.ok) continue;
+
+                const pollData = await pollResponse.json();
+                lastPollData = pollData;
+
+                // 尝试从响应中提取视频 URL
+                const videos = adapter.parseVideoResponse(pollData as Record<string, unknown>);
+
+                if (videos.length > 0) {
+                  console.log(`[Custom API Video] Success!`);
+                  const persistedVideos = await persistAllMediaUrls(videos, 'generated/videos');
+                  return NextResponse.json({ videos: persistedVideos });
+                }
+
+                // 检查状态是否成功/失败
+                const pollStatus = (pollData as Record<string, unknown>).task_status as string ||
+                  ((pollData as Record<string, unknown>).output as Record<string, unknown>)?.task_status as string ||
+                  (pollData as Record<string, unknown>).status as string;
+
+                if (pollStatus === 'SUCCEEDED' || pollStatus === 'succeeded' || pollStatus === 'success') {
+                  const videos = adapter.parseVideoResponse(pollData as Record<string, unknown>);
+                  if (videos.length > 0) {
+                    console.log(`[Custom API Video] Success!`);
+                    const persistedVideos = await persistAllMediaUrls(videos, 'generated/videos');
+                    return NextResponse.json({ videos: persistedVideos });
+                  }
+                }
+
+                if (pollStatus === 'FAILED' || pollStatus === 'failed' || pollStatus === 'fail') {
+                  console.log(`[Custom API Video] Failed`);
+                  return NextResponse.json({ error: '视频生成失败' }, { status: 500 });
+                }
+
+                // 每30秒打印一次进度
+                if (i % 10 === 0) {
+                  console.log(`[Custom API Video] Poll ${i + 1}, status: ${pollStatus || 'unknown'}`);
+                }
+                break; // 找到有效端点，不再尝试其他
+              } catch {
+                // 继续尝试下一个端点
+              }
+            }
+          }
+
+          // 超时后返回最后的状态信息
+          const lastStatus = lastPollData ? JSON.stringify(lastPollData).slice(0, 200) : '无响应';
+          return NextResponse.json({
+            error: `视频生成超时（已等待30分钟），任务可能仍在处理中。你可以使用 task_id: ${responseTaskId} 稍后手动查询结果`,
+            taskId: responseTaskId,
+            lastStatus
+          }, { status: 504 });
+        }
+
+        // 非异步模式：直接解析响应
         const videos = adapter.parseVideoResponse(customData as Record<string, unknown>);
 
         if (videos.length === 0) {
@@ -175,9 +360,9 @@ export async function POST(request: NextRequest) {
         const persistedVideos = await persistAllMediaUrls(videos, 'generated/videos');
         return NextResponse.json({ videos: persistedVideos });
       } catch (customError: unknown) {
-        const msg = customError instanceof Error ? customError.message : '自定义API请求异常';
-        console.error('[Custom API Video Exception]', msg);
-        return NextResponse.json({ error: `自定义API异常: ${msg}` }, { status: 502 });
+        const err = customError instanceof Error ? customError : new Error(String(customError));
+        console.error('[Custom API Video Exception]', err.message, err.stack);
+        return NextResponse.json({ error: `自定义API异常: ${err.message}` }, { status: 502 });
       }
     }
 

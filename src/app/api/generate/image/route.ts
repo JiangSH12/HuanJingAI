@@ -4,6 +4,7 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { buildCustomApiHeaders, fetchWithRetry, parseCustomApiError } from '@/lib/custom-api-fetch';
 import { resolveCustomApiImageSize } from '@/lib/model-config';
 import { getAdapter } from '@/lib/api-adapters';
+import { buildDashScopeGenerationUrl } from '@/lib/api-adapters/dashscope';
 import type { ImageAdapterParams } from '@/lib/api-adapters/types';
 
 // 硅基流动默认配置
@@ -111,6 +112,7 @@ export async function POST(request: NextRequest) {
       guidanceScale = 7,
       image,
       strength,
+      extraImages,
       customApiConfig,
     } = body as {
       prompt?: string;
@@ -123,6 +125,7 @@ export async function POST(request: NextRequest) {
       guidanceScale?: number;
       image?: string;
       strength?: number;
+      extraImages?: string[];
       customApiConfig?: {
         apiUrl: string;
         modelName: string;
@@ -157,7 +160,7 @@ export async function POST(request: NextRequest) {
           guidanceScale,
         };
 
-        // 如果是图生图，上传参考图
+        // 图生图：上传参考图到 S3 获取公网 URL
         let imageUrl = image;
         if (image) {
           if (image.startsWith('data:')) {
@@ -168,10 +171,67 @@ export async function POST(request: NextRequest) {
           params.strength = strength;
         }
 
+        // 额外参考图（多图编辑）：上传到 S3 获取公网 URL
+        if (extraImages && extraImages.length > 0) {
+          const uploadedExtras: string[] = [];
+          for (const extraImg of extraImages) {
+            if (extraImg.startsWith('data:')) {
+              const uploadedUrl = await uploadDataUrlAndGetPublicUrl(extraImg);
+              if (uploadedUrl) uploadedExtras.push(uploadedUrl);
+            } else {
+              uploadedExtras.push(extraImg);
+            }
+          }
+          params.extraImages = uploadedExtras;
+        }
+
         const requestBody = adapter.buildImageRequest(params);
 
         console.log('[Custom API Image] format:', customApiConfig.apiFormat || 'openai', '| model:', customApiConfig.modelName);
 
+        // ---- DashScope 同步模式 ----
+        if (customApiConfig.apiFormat === 'dashscope') {
+          const dashscopeUrl = buildDashScopeGenerationUrl(customApiConfig.apiUrl);
+          const headers = buildCustomApiHeaders(customApiConfig.apiKey, customApiConfig.apiFormat);
+
+          console.log('[DashScope Image] URL:', dashscopeUrl, '| model:', customApiConfig.modelName, '| hasImage:', !!image);
+
+          let response: Response;
+          try {
+            response = await fetchWithRetry(
+              dashscopeUrl,
+              { method: 'POST', headers, body: JSON.stringify(requestBody) },
+              GENERATION_TIMEOUT,
+              1,
+            );
+          } catch (fetchError: unknown) {
+            if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+              return NextResponse.json({ error: 'DashScope API 请求超时（120秒）' }, { status: 504 });
+            }
+            const msg = fetchError instanceof Error ? fetchError.message : '请求失败';
+            return NextResponse.json({ error: `DashScope API 网络错误: ${msg}` }, { status: 502 });
+          }
+
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('[DashScope Error]', response.status, errorText.slice(0, 500));
+            return NextResponse.json({ error: parseCustomApiError(response.status, errorText) }, { status: response.status });
+          }
+
+          const data = await response.json() as Record<string, unknown>;
+          const images = adapter.parseImageResponse(data);
+
+          if (images.length > 0) {
+            const persistedImages = await persistAllMediaUrls(images, 'generated/images');
+            console.log('[DashScope Image] Success, images:', images.length);
+            return NextResponse.json({ images: persistedImages });
+          }
+
+          console.error('[DashScope Image] No images in response:', JSON.stringify(data).slice(0, 500));
+          return NextResponse.json({ error: 'DashScope 未返回图片', raw: data }, { status: 502 });
+        }
+
+        // ---- 同步模式 (openai/kling) ----
         let customResponse: Response;
         try {
           customResponse = await fetchWithRetry(

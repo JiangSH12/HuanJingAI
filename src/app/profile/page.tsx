@@ -45,7 +45,9 @@ import {
   Sparkles,
   MessageSquare,
   ImageOff,
+  Wand2,
 } from 'lucide-react';
+import { SmartApiConfigDialog } from '@/components/smart-api-config-dialog';
 
 // Mock data for demo - in production, fetch from API
 const mockProfile = {
@@ -76,8 +78,9 @@ const PROVIDER_PRESETS = [
   { name: 'Runway', defaultUrl: 'https://api.runwayml.com/v1/image_to_video', defaultModel: 'gen-3-alpha', defaultType: 'video' as const, defaultFormat: 'openai' as const },
   { name: 'Pika', defaultUrl: '', defaultModel: 'pika-1.0', defaultType: 'video' as const, defaultFormat: 'openai' as const },
   { name: '可灵 (Kling)', defaultUrl: 'https://api.kling.ai/v1/images/generations', defaultModel: 'kling-v3-omni', defaultType: 'image' as const, defaultFormat: 'kling' as const, website: 'https://platform.kling.ai' },
+  // 阿里云 DashScope（使用 dashscope 格式，基础 URL 会自动拼接）
+  { name: '阿里云', defaultUrl: 'https://dashscope.aliyuncs.com/api/v1', defaultModel: 'wan2.7-image', defaultType: 'image' as const, defaultFormat: 'dashscope' as const, website: 'https://dashscope.console.aliyun.com' },
   { name: 'DeepSeek', defaultUrl: 'https://api.deepseek.com/v1/chat/completions', defaultModel: 'deepseek-chat', defaultType: 'text' as const, defaultFormat: 'openai' as const },
-  { name: 'OpenAI GPT', defaultUrl: 'https://api.openai.com/v1/chat/completions', defaultModel: 'gpt-4o', defaultType: 'text' as const, defaultFormat: 'openai' as const },
   { name: '自定义', defaultUrl: '', defaultModel: '', defaultType: 'image' as const, defaultFormat: 'openai' as const },
 ];
 
@@ -85,6 +88,7 @@ function ApiKeyManager() {
   const { keys, add, update, remove, toggleActive } = useCustomApiKeys();
   const [showForm, setShowForm] = useState(false);
   const [showApiKey, setShowApiKey] = useState(false);
+  const [showSmartConfig, setShowSmartConfig] = useState(false);
 
   // Form state
   const [provider, setProvider] = useState('');
@@ -94,7 +98,7 @@ function ApiKeyManager() {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [formType, setFormType] = useState<'image' | 'video' | 'text'>('image');
-  const [formFormat, setFormFormat] = useState<'openai' | 'kling'>('openai');
+  const [formFormat, setFormFormat] = useState<'openai' | 'kling' | 'dashscope'>('openai');
 
   // Test connection state
   const [testing, setTesting] = useState(false);
@@ -110,12 +114,38 @@ function ApiKeyManager() {
     setProvider(value);
     const preset = PROVIDER_PRESETS.find(p => p.name === value);
     if (preset) {
-      setApiUrl(preset.defaultUrl);
+      // 硅基流动：根据类型使用不同的端点
+      if (preset.name === '硅基流动') {
+        if (formType === 'text') {
+          setApiUrl('https://api.siliconflow.cn/v1/chat/completions');
+        } else if (formType === 'video') {
+          setApiUrl('https://api.siliconflow.cn/v1/video/submit');
+        } else {
+          setApiUrl(preset.defaultUrl);
+        }
+      } else {
+        setApiUrl(preset.defaultUrl);
+      }
       setModelName(preset.defaultModel);
       if (preset.defaultType) setFormType(preset.defaultType);
       if (preset.defaultFormat) setFormFormat(preset.defaultFormat);
     }
     setTestResult(null);
+  };
+
+  // 切换模型类型时，如果是硅基流动，自动更新API地址
+  const handleTypeChange = (type: 'image' | 'video' | 'text') => {
+    setFormType(type);
+    if (provider === '硅基流动') {
+      if (type === 'text') {
+        setApiUrl('https://api.siliconflow.cn/v1/chat/completions');
+      } else if (type === 'video') {
+        setApiUrl('https://api.siliconflow.cn/v1/video/submit');
+      } else {
+        const preset = PROVIDER_PRESETS.find(p => p.name === '硅基流动');
+        setApiUrl(preset?.defaultUrl || '');
+      }
+    }
   };
 
   const handleAddKey = () => {
@@ -198,6 +228,11 @@ function ApiKeyManager() {
       : apiKey.trim();
     if (!apiUrl.trim() || !keyValue) {
       setTestResult({ success: false, message: `请先填写 API 请求地址和 ${isKling ? 'AccessKey/SecretKey' : 'API Key'}` });
+      return;
+    }
+    // Validate URL format
+    if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
+      setTestResult({ success: false, message: `API 地址无效：${apiUrl} — 请填写完整 URL（以 http:// 或 https:// 开头）` });
       return;
     }
     setTesting(true);
@@ -305,12 +340,29 @@ function ApiKeyManager() {
           <Separator />
 
           {/* Add key button / form */}
-          {!showForm ? (
-            <Button variant="outline" className="gap-2" onClick={() => setShowForm(true)}>
-              <Plus className="h-4 w-4" />添加 API 密钥
+          <div className="flex items-center gap-3">
+            {!showForm ? (
+              <Button variant="outline" className="gap-2" onClick={() => setShowForm(true)}>
+                <Plus className="h-4 w-4" />添加 API 密钥
+              </Button>
+            ) : (
+              <Button variant="outline" className="gap-2" onClick={() => setShowForm(true)}>
+                <Plus className="h-4 w-4" />添加 API 密钥
+              </Button>
+            )}
+            <Button variant="outline" className="gap-2 text-primary border-primary/30 hover:bg-primary/5" onClick={() => setShowSmartConfig(true)}>
+              <Wand2 className="h-4 w-4" />智能配置 API
             </Button>
-          ) : (
-            <div className="space-y-4 p-4 rounded-lg border border-primary/20 bg-primary/5">
+            {showForm && (
+              <Button variant="ghost" size="sm" onClick={resetForm}>
+                收起表单
+              </Button>
+            )}
+          </div>
+
+          {/* 表单区域 */}
+          {showForm && (
+          <div className="space-y-4 p-4 rounded-lg border border-primary/20 bg-primary/5 mt-4">
               <h3 className="font-medium flex items-center gap-2">
                 {editingKeyId ? (
                   <>
@@ -363,7 +415,7 @@ function ApiKeyManager() {
                   <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
                   模型类型 <span className="text-destructive">*</span>
                 </Label>
-                <Select value={formType} onValueChange={v => setFormType(v as 'image' | 'video' | 'text')}>
+                <Select value={formType} onValueChange={handleTypeChange}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -397,16 +449,17 @@ function ApiKeyManager() {
                   <Globe className="h-3.5 w-3.5 text-muted-foreground" />
                   API 格式 <span className="text-destructive">*</span>
                 </Label>
-                <Select value={formFormat} onValueChange={v => setFormFormat(v as 'openai' | 'kling')}>
+                <Select value={formFormat} onValueChange={v => setFormFormat(v as 'openai' | 'kling' | 'dashscope')}>
                   <SelectTrigger>
                     <SelectValue placeholder="选择 API 格式..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="openai">OpenAI 兼容</SelectItem>
+                    <SelectItem value="dashscope">DashScope (通义万相)</SelectItem>
                     <SelectItem value="kling">可灵 (Kling)</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">OpenAI 兼容适用于大部分 API，可灵适用于可灵官方 API</p>
+                <p className="text-xs text-muted-foreground">OpenAI 兼容适用于大部分 API，DashScope 适用于通义万相/wan2.x 系列，可灵适用于可灵官方 API</p>
               </div>
 
               {/* Row 2: Model Name + API Key (OpenAI) / AccessKey + SecretKey (Kling) */}
@@ -535,6 +588,9 @@ function ApiKeyManager() {
             </div>
           )}
 
+          {/* 智能配置 API 弹窗 */}
+          <SmartApiConfigDialog open={showSmartConfig} onOpenChange={setShowSmartConfig} />
+
           <Separator />
 
           {/* Configured keys list */}
@@ -571,8 +627,8 @@ function ApiKeyManager() {
                               <span className="flex items-center gap-1"><Image className="h-3 w-3" />生图</span>
                             )}
                           </Badge>
-                          <Badge variant="outline" className={`text-xs ${key.apiFormat === 'kling' ? 'border-purple-500/50 text-purple-600 dark:text-purple-400' : 'border-blue-500/50 text-blue-600 dark:text-blue-400'}`}>
-                            {key.apiFormat === 'kling' ? '可灵' : 'OpenAI'}
+                          <Badge variant="outline" className={`text-xs ${key.apiFormat === 'kling' ? 'border-purple-500/50 text-purple-600 dark:text-purple-400' : key.apiFormat === 'dashscope' ? 'border-green-500/50 text-green-600 dark:text-green-400' : 'border-blue-500/50 text-blue-600 dark:text-blue-400'}`}>
+                            {key.apiFormat === 'kling' ? '可灵' : key.apiFormat === 'dashscope' ? 'DashScope' : 'OpenAI'}
                           </Badge>
                           <Badge variant="outline" className="font-mono text-xs">
                             {key.apiKeyPreview}

@@ -18,6 +18,7 @@ export interface SystemApiConfig {
   apiKey: string;          // Server-side key (masked in UI)
   apiKeyPreview: string;   // e.g. "sk-...abc"
   type: 'image' | 'video' | 'text'; // What this API generates
+  apiFormat: 'openai' | 'kling' | 'dashscope'; // API format, default 'openai'
   creditsPerUse: number;   // Credits consumed per generation
   isActive: boolean;
   sortOrder: number;
@@ -95,6 +96,7 @@ const DEFAULT_SYSTEM_APIS: SystemApiConfig[] = [
     apiKey: '',
     apiKeyPreview: '',
     type: 'image',
+    apiFormat: 'openai',
     creditsPerUse: 10,
     isActive: false,
     sortOrder: 0,
@@ -107,6 +109,7 @@ const DEFAULT_SYSTEM_APIS: SystemApiConfig[] = [
     apiKey: '',
     apiKeyPreview: '',
     type: 'video',
+    apiFormat: 'openai',
     creditsPerUse: 30,
     isActive: false,
     sortOrder: 1,

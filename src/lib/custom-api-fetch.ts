@@ -35,6 +35,14 @@ export function buildCustomApiHeaders(apiKey: string, apiFormat?: string): Recor
       'Authorization': `Bearer ${apiKey}`,
     };
   }
+  // DashScope API 使用 Bearer token 鉴权
+  // 注意：同步端点不需要 X-DashScope-Async 头
+  if (apiFormat === 'dashscope') {
+    return {
+      ...STANDARD_HEADERS,
+      'Authorization': `Bearer ${apiKey}`,
+    };
+  }
   return {
     ...STANDARD_HEADERS,
     'Authorization': `Bearer ${apiKey}`,

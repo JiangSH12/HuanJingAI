@@ -23,16 +23,38 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Validate that apiUrl is a complete URL, not a relative path
+    if (!apiUrl.startsWith('http://') && !apiUrl.startsWith('https://')) {
+      return NextResponse.json(
+        { success: false, error: `API 地址无效：${apiUrl} — 请填写完整的 URL（以 http:// 或 https:// 开头）`, suggestion: '例如：https://api.openai.com/v1/images/generations' },
+        { status: 400 }
+      );
+    }
+
     // If apiFormat is provided, use adapter-based test
     if (apiFormat) {
       const adapter = getAdapter(apiFormat);
       const testReq = adapter.buildTestRequest({ apiUrl, modelName: modelName || '', apiKey });
+
+      // DashScope 格式需要特殊请求头
+      let headers: Record<string, string>;
+      if (apiFormat === 'dashscope' && testReq.headers) {
+        headers = {
+          ...testReq.headers,
+          'Authorization': `Bearer ${apiKey}`,
+        };
+      } else {
+        headers = buildCustomApiHeaders(apiKey, apiFormat);
+      }
+
+      console.log('[Test API] format:', apiFormat, '| url:', testReq.url, '| method:', testReq.method);
+
       try {
         const response = await fetchWithRetry(
           testReq.url,
           {
             method: testReq.method,
-            headers: buildCustomApiHeaders(apiKey, apiFormat),
+            headers,
             body: testReq.method === 'POST' ? JSON.stringify(testReq.body) : undefined,
           },
           15_000,

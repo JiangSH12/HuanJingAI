@@ -116,16 +116,17 @@ function ApiManagementTab() {
   const [formModelName, setFormModelName] = useState('');
   const [formApiKey, setFormApiKey] = useState('');
   const [formType, setFormType] = useState<'image' | 'video' | 'text'>('image');
+  const [formApiFormat, setFormApiFormat] = useState<'openai' | 'kling' | 'dashscope'>('openai');
   const [formCredits, setFormCredits] = useState('10');
 
   const resetForm = () => {
     setFormName(''); setFormApiUrl(''); setFormModelName(''); setFormApiKey('');
-    setFormType('image'); setFormCredits('10'); setEditingId(null); setShowForm(false);
+    setFormType('image'); setFormApiFormat('openai'); setFormCredits('10'); setEditingId(null); setShowForm(false);
   };
 
   const startEdit = (api: SystemApiConfig) => {
     setFormName(api.name); setFormApiUrl(api.apiUrl); setFormModelName(api.modelName);
-    setFormApiKey(api.apiKey); setFormType(api.type); setFormCredits(String(api.creditsPerUse));
+    setFormApiKey(api.apiKey); setFormType(api.type); setFormApiFormat(api.apiFormat || 'openai'); setFormCredits(String(api.creditsPerUse));
     setEditingId(api.id); setShowForm(true);
   };
 
@@ -141,6 +142,7 @@ function ApiManagementTab() {
       apiKey: formApiKey,
       apiKeyPreview: formApiKey ? `${formApiKey.slice(0, 6)}...${formApiKey.slice(-4)}` : '',
       type: formType,
+      apiFormat: formApiFormat,
       creditsPerUse: Number(formCredits) || 10,
       isActive: true,
     };
@@ -194,6 +196,7 @@ function ApiManagementTab() {
                         {api.isActive ? '已启用' : '未启用'}
                       </Badge>
                       <Badge variant="outline" className="text-xs">{api.type === 'image' ? '图片' : api.type === 'video' ? '视频' : '文本'}</Badge>
+                      <Badge variant="outline" className="text-xs">{api.apiFormat === 'dashscope' ? 'DashScope' : api.apiFormat === 'kling' ? '可灵' : 'OpenAI'}</Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-3">
                       <span className="flex items-center gap-1"><Cpu className="h-3 w-3" />{api.modelName}</span>
@@ -249,6 +252,18 @@ function ApiManagementTab() {
                   </SelectContent>
                 </Select>
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label>API 格式</Label>
+              <Select value={formApiFormat} onValueChange={v => setFormApiFormat(v as 'openai' | 'kling' | 'dashscope')}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="openai">OpenAI 兼容</SelectItem>
+                  <SelectItem value="dashscope">DashScope (通义万相)</SelectItem>
+                  <SelectItem value="kling">可灵 (Kling)</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">选择 API 提供商的请求格式，wan2.1/wan2.7 系列选 DashScope</p>
             </div>
             <div className="space-y-2">
               <Label>API 请求地址</Label>

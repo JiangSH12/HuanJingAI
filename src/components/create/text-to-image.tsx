@@ -168,19 +168,19 @@ export function TextToImagePanel() {
       if (isCustomModel(selectedModel)) {
         const key = imageKeys.find(k => k.id === getCustomKeyId(selectedModel));
         if (key) {
-          requestBody = { ...requestBody, model: key.modelName, customApiConfig: { apiUrl: key.apiUrl, modelName: key.modelName, apiKey: key.apiKey } };
+          requestBody = { ...requestBody, model: key.modelName, customApiConfig: { apiUrl: key.apiUrl, modelName: key.modelName, apiKey: key.apiKey, apiFormat: key.apiFormat } };
         }
       } else if (isSystemModel(selectedModel)) {
         const api = systemImageApis.find(a => a.id === getSystemApiId(selectedModel));
         if (api) {
-          requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey } };
+          requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey, apiFormat: (api as Record<string, unknown>).apiFormat as string | undefined } };
         }
       }
       // siliconflow-default 不传 customApiConfig，让后端使用默认配置
 
       // Fetch with 180s timeout for image generation
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 180_000);
+      const timeoutId = setTimeout(() => controller.abort(), 300_000);
 
       const res = await fetch('/api/generate/image', {
         method: 'POST',
@@ -288,19 +288,39 @@ export function TextToImagePanel() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>创作描述</Label>
-            {textModelOptions.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-primary hover:text-primary" onClick={handleOptimizePrompt} disabled={optimizing || !prompt.trim()}>
-                {optimizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-                {optimizing ? '优化中...' : '优化提示词'}
-              </Button>
-            )}
           </div>
-          <Textarea
-            placeholder="描述你想要生成的图片，越详细效果越好..."
-            rows={4}
-            value={prompt}
-            onChange={e => setPrompt(e.target.value)}
-          />
+          <div className="relative">
+            <Textarea
+              placeholder="描述你想要生成的图片，越详细效果越好..."
+              rows={4}
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              className="pr-20 pb-8"
+            />
+            <div className="absolute bottom-2 right-2">
+              {textModelOptions.length > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                  onClick={handleOptimizePrompt}
+                  disabled={optimizing || !prompt.trim()}
+                >
+                  {optimizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                  {optimizing ? '优化中...' : '优化'}
+                </Button>
+              ) : (
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  title="前往个人中心配置文本模型"
+                >
+                  <Wand2 className="h-3 w-3" />
+                  配置模型
+                </Link>
+              )}
+            </div>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {STYLE_PRESETS.map(s => (
               <Badge key={s} variant="outline" className="cursor-pointer hover:bg-primary/10 text-xs" onClick={() => setPrompt(prev => prev ? `${prev}, ${s}` : s)}>

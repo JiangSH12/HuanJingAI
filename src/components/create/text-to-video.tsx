@@ -45,6 +45,7 @@ export function TextToVideoPanel() {
 
   const [generating, setGenerating] = useState(false);
   const [results, setResults] = useState<string[]>([]);
+  const [generatingPlaceholder, setGeneratingPlaceholder] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
 
   const { records, add: addRecord } = useCreationHistory();
@@ -132,6 +133,7 @@ export function TextToVideoPanel() {
     if (!user) { toast.error('请先登录'); return; }
 
     setGenerating(true);
+    setGeneratingPlaceholder(true);
     try {
       let requestBody: Record<string, unknown> = {
         prompt: prompt.trim(),
@@ -145,27 +147,24 @@ export function TextToVideoPanel() {
       if (isCustomModel(selectedModel)) {
         const key = videoKeys.find(k => k.id === getCustomKeyId(selectedModel));
         if (key) {
-          requestBody = { ...requestBody, model: key.modelName, customApiConfig: { apiUrl: key.apiUrl, modelName: key.modelName, apiKey: key.apiKey } };
+          requestBody = { ...requestBody, model: key.modelName, customApiConfig: { apiUrl: key.apiUrl, modelName: key.modelName, apiKey: key.apiKey, apiFormat: key.apiFormat } };
         }
       } else if (isSystemModel(selectedModel)) {
         const api = systemVideoApis.find(a => a.id === getSystemApiId(selectedModel));
         if (api) {
-          requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey } };
+          requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey, apiFormat: api.apiFormat } };
         }
       }
       // siliconflow-default 不传 customApiConfig，让后端使用默认配置
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 240_000);
       const res = await fetch('/api/generate/video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestBody),
-        signal: controller.signal,
       });
-      clearTimeout(timeoutId);
 
       if (!res.ok) {
+        setGeneratingPlaceholder(false);
         let errorMsg = `请求失败 (${res.status})`;
         try { const errData = await res.json(); if (errData.error) errorMsg = errData.error; } catch { /* ignore */ }
         throw new Error(errorMsg);
@@ -173,6 +172,7 @@ export function TextToVideoPanel() {
 
       const data = await res.json();
       if (data.videos && data.videos.length > 0) {
+        setGeneratingPlaceholder(false);
         setResults(data.videos);
         for (const url of data.videos) {
           addRecord({
@@ -195,9 +195,11 @@ export function TextToVideoPanel() {
           });
         }
       } else {
+        setGeneratingPlaceholder(false);
         toast.error(data.error || '视频生成失败');
       }
     } catch (err: unknown) {
+      setGeneratingPlaceholder(false);
       if (err instanceof DOMException && err.name === 'AbortError') {
         toast.error('请求超时，视频生成可能需要更长时间');
       } else {
@@ -256,14 +258,39 @@ export function TextToVideoPanel() {
         <div className="space-y-2">
           <div className="flex items-center justify-between">
             <Label>视频描述</Label>
-            {textModelOptions.length > 0 && (
-              <Button variant="ghost" size="sm" className="h-7 gap-1.5 text-xs text-primary hover:text-primary" onClick={handleOptimizePrompt} disabled={optimizing || !prompt.trim()}>
-                {optimizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
-                {optimizing ? '优化中...' : '优化提示词'}
-              </Button>
-            )}
           </div>
-          <Textarea placeholder="描述你想要生成的视频画面..." rows={4} value={prompt} onChange={e => setPrompt(e.target.value)} />
+          <div className="relative">
+            <Textarea
+              placeholder="描述你想要生成的视频画面..."
+              rows={4}
+              value={prompt}
+              onChange={e => setPrompt(e.target.value)}
+              className="pr-20 pb-8"
+            />
+            <div className="absolute bottom-2 right-2">
+              {textModelOptions.length > 0 ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-7 gap-1.5 text-xs text-primary hover:text-primary hover:bg-primary/10"
+                  onClick={handleOptimizePrompt}
+                  disabled={optimizing || !prompt.trim()}
+                >
+                  {optimizing ? <Loader2 className="h-3 w-3 animate-spin" /> : <Wand2 className="h-3 w-3" />}
+                  {optimizing ? '优化中...' : '优化'}
+                </Button>
+              ) : (
+                <Link
+                  href="/profile"
+                  className="inline-flex items-center gap-1 h-7 px-2 rounded-md text-xs text-muted-foreground hover:text-primary hover:bg-primary/10 transition-colors"
+                  title="前往个人中心配置文本模型"
+                >
+                  <Wand2 className="h-3 w-3" />
+                  配置模型
+                </Link>
+              )}
+            </div>
+          </div>
           <div className="flex flex-wrap gap-1.5">
             {VIDEO_STYLES.map(s => (
               <Badge key={s} variant="outline" className="cursor-pointer hover:bg-primary/10 text-xs" onClick={() => setStyle(s)}>{s}</Badge>
@@ -320,9 +347,28 @@ export function TextToVideoPanel() {
 
       {/* Right: Results + History */}
       <div className="flex-1 min-w-0 space-y-4">
-        {results.length > 0 ? (
+        {results.length > 0 || generatingPlaceholder ? (
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium"><Video className="h-4 w-4" />生成结果</div>
+            {generatingPlaceholder && (
+              <div className="rounded-lg border border-border overflow-hidden bg-muted/50">
+                <div className="relative w-full aspect-video bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 animate-pulse flex items-center justify-center">
+                  <div className="text-center space-y-3">
+                    <div className="relative">
+                      <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin" />
+                      <div className="absolute inset-0 flex items-center justify-center">
+                        <Film className="h-5 w-5 text-primary/50" />
+                      </div>
+                    </div>
+                    <p className="text-sm text-muted-foreground">视频生成中...</p>
+                    <p className="text-xs text-muted-foreground/60">异步任务可能需要较长时间，请耐心等待</p>
+                  </div>
+                </div>
+                <div className="p-3 bg-muted/30">
+                  <p className="text-xs text-muted-foreground line-clamp-1">{prompt}</p>
+                </div>
+              </div>
+            )}
             {results.map((url, i) => (
               <div key={i} className="rounded-lg border border-border overflow-hidden bg-muted/50">
                 <video src={url} controls className="w-full" />

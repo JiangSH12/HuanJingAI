@@ -9,11 +9,22 @@
 import type { ApiAdapter, ApiFormat } from './types';
 import { openaiAdapter } from './openai';
 import { klingAdapter } from './kling';
+import { dashscopeAdapter } from './dashscope';
+
+// 重新导出 dashscope 工具函数
+export {
+  buildDashScopeGenerationUrl,
+  buildDashScopeVideoSynthesisUrl,
+  buildDashScopePollUrl,
+  extractVideoTaskId,
+  extractVideoTaskStatus,
+} from './dashscope';
 
 /** 适配器注册表 */
 const ADAPTERS_MAP: Record<ApiFormat, ApiAdapter> = {
   openai: openaiAdapter,
   kling: klingAdapter,
+  dashscope: dashscopeAdapter,
 };
 
 /**
@@ -35,6 +46,7 @@ export function getSupportedFormats(): { value: ApiFormat; label: string }[] {
   return [
     { value: 'openai', label: 'OpenAI 兼容' },
     { value: 'kling', label: '可灵 (Kling)' },
+    { value: 'dashscope', label: 'DashScope (通义万相)' },
   ];
 }
 

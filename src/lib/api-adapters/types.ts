@@ -6,7 +6,7 @@
  */
 
 /** 适配器类型标识 */
-export type ApiFormat = 'openai' | 'kling';
+export type ApiFormat = 'openai' | 'kling' | 'dashscope';
 
 /** 模型类型 */
 export type ModelType = 'image' | 'video' | 'text';
@@ -26,6 +26,8 @@ export interface ImageAdapterParams {
   image?: string;
   /** 图生图专用：重绘幅度 0~1 */
   strength?: number;
+  /** 图像编辑专用：额外参考图（多图编辑场景） */
+  extraImages?: string[];
 }
 
 /** 视频生成适配器参数 */
