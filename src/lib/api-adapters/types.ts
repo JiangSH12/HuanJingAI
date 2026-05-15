@@ -6,7 +6,7 @@
  */
 
 /** 适配器类型标识 */
-export type ApiFormat = 'openai' | 'kling' | 'dashscope';
+export type ApiFormat = 'openai' | 'kling' | 'dashscope' | 'volcengine';
 
 /** 模型类型 */
 export type ModelType = 'image' | 'video' | 'text';
@@ -87,7 +87,7 @@ export interface ApiAdapter {
   parseVideoResponse(data: Record<string, unknown>): string[];
 
   /** 构建测试连接的请求体 */
-  buildTestRequest(params: TestAdapterParams): { url: string; body: Record<string, unknown>; method: string };
+  buildTestRequest(params: TestAdapterParams): { url: string; body: Record<string, unknown>; method: string; headers?: Record<string, string> };
 
   /** 解析测试连接响应 */
   parseTestResponse(data: Record<string, unknown>, status: number, rawBody: string): TestAdapterResult;

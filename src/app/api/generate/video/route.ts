@@ -1,9 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Storage } from '@aws-sdk/client-s3';
-import { Upload } from '@aws-sdk/lib-storage';
 import { buildCustomApiHeaders, fetchWithRetry, parseCustomApiError } from '@/lib/custom-api-fetch';
 import { getAspectRatioPromptHint } from '@/lib/model-config';
-import { getAdapter, buildDashScopeVideoSynthesisUrl, buildDashScopePollUrl, extractVideoTaskId, extractVideoTaskStatus } from '@/lib/api-adapters';
+import { getAdapter, buildDashScopeVideoSynthesisUrl, buildDashScopePollUrl, extractVideoTaskId, extractVideoTaskStatus, buildVolcEngineVideoSubmitUrl, buildVolcEnginePollUrl, extractVolcEngineTaskId, extractVolcEngineTaskStatus } from '@/lib/api-adapters';
 import type { VideoAdapterParams } from '@/lib/api-adapters/types';
 
 // 硅基流动默认配置
@@ -15,10 +13,18 @@ const SILICONFLOW_CONFIG = {
 
 const GENERATION_TIMEOUT = 300_000; // 5分钟
 
+// 动态导入 S3 模块以兼容 Next.js 15 Turbopack
+async function getS3Upload() {
+  const { S3Storage } = await import('@aws-sdk/client-s3');
+  const { Upload } = await import('@aws-sdk/lib-storage');
+  return { S3Storage, Upload };
+}
+
 async function persistMediaToStorage(dataUrl: string, prefix: string): Promise<string> {
   if (!dataUrl.startsWith('data:')) return dataUrl;
 
   try {
+    const { S3Storage, Upload } = await getS3Upload();
     const match = dataUrl.match(/^data:((?:image|video)\/[^;]+);base64,(.+)$/);
     if (!match) return dataUrl;
     const [, mimeType, base64Data] = match;
@@ -67,6 +73,7 @@ async function persistAllMediaUrls(urls: string[], prefix: string): Promise<stri
 
 async function uploadDataUrlAndGetPublicUrl(dataUrl: string): Promise<string | null> {
   try {
+    const { S3Storage, Upload } = await getS3Upload();
     const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
     if (!match) return null;
     const [, mimeType, base64Data] = match;
@@ -128,6 +135,19 @@ export async function POST(request: NextRequest) {
     if (customApiConfig && customApiConfig.apiKey) {
       try {
         const adapter = getAdapter(customApiConfig.apiFormat);
+
+        // 火山引擎需要公网可访问的图片 URL，不能使用 data URL
+        // 在构建 params 前上传参考图
+        let imageUrl: string | undefined;
+        if (image) {
+          if (image.startsWith('data:') && customApiConfig.apiFormat === 'volcengine') {
+            const uploadedUrl = await uploadDataUrlAndGetPublicUrl(image);
+            if (uploadedUrl) imageUrl = uploadedUrl;
+          } else {
+            imageUrl = image;
+          }
+        }
+
         const params: VideoAdapterParams = {
           apiUrl: customApiConfig.apiUrl,
           modelName: customApiConfig.modelName,
@@ -137,15 +157,17 @@ export async function POST(request: NextRequest) {
           aspectRatio,
           duration,
           fps,
-          image,
+          image: imageUrl,
         };
 
         const requestBody = adapter.buildVideoRequest(params);
 
-        // 确定请求 URL（dashscope 格式使用专用视频端点）
+        // 确定请求 URL（dashscope/volcengine 格式使用专用视频端点）
         let requestUrl = customApiConfig.apiUrl;
         if (customApiConfig.apiFormat === 'dashscope') {
           requestUrl = buildDashScopeVideoSynthesisUrl(customApiConfig.apiUrl);
+        } else if (customApiConfig.apiFormat === 'volcengine') {
+          requestUrl = buildVolcEngineVideoSubmitUrl(customApiConfig.apiUrl);
         }
 
         // 构建请求头
@@ -251,6 +273,68 @@ export async function POST(request: NextRequest) {
             }
 
             return NextResponse.json({ error: '视频生成超时，请稍后重试' }, { status: 504 });
+          }
+        }
+
+        // volcengine 异步模式：轮询获取结果
+        if (customApiConfig.apiFormat === 'volcengine') {
+          const taskId = extractVolcEngineTaskId(customData as Record<string, unknown>);
+          if (taskId) {
+            const pollUrl = buildVolcEnginePollUrl(customApiConfig.apiUrl, taskId);
+
+            const maxRetries = 120; // 最多等待 10 分钟
+            // 动态轮询间隔：前30秒每3秒一次，之后每5秒一次
+            const getPollInterval = (i: number) => i < 10 ? 3000 : 5000;
+
+            console.log(`[VolcEngine Video] Starting polling, submitUrl: ${customApiConfig.apiUrl}`);
+            console.log(`[VolcEngine Video] Poll URL: ${pollUrl}, taskId: ${taskId}`);
+            console.log(`[VolcEngine Video] Raw submit response:`, JSON.stringify(customData).slice(0, 500));
+
+            for (let i = 0; i < maxRetries; i++) {
+              await new Promise(resolve => setTimeout(resolve, getPollInterval(i)));
+
+              try {
+                const pollResponse = await fetch(pollUrl, {
+                  method: 'GET',
+                  headers: {
+                    'Authorization': `Bearer ${customApiConfig.apiKey}`,
+                  },
+                });
+
+                if (!pollResponse.ok) {
+                  console.log(`[VolcEngine Video] Poll ${i + 1} failed: ${pollResponse.status}`);
+                  continue;
+                }
+
+                const pollData = await pollResponse.json();
+                console.log(`[VolcEngine Video] Poll ${i + 1} response:`, JSON.stringify(pollData).slice(0, 500));
+                
+                const { status, videoUrl, error } = extractVolcEngineTaskStatus(pollData as Record<string, unknown>);
+
+                if (status === 'succeeded' && videoUrl) {
+                  console.log(`[VolcEngine Video] Success!`);
+                  const videos = [videoUrl];
+                  const persistedVideos = await persistAllMediaUrls(videos, 'generated/videos');
+                  return NextResponse.json({ videos: persistedVideos });
+                }
+
+                if (status === 'failed') {
+                  console.log(`[VolcEngine Video] Failed: ${error}`);
+                  return NextResponse.json({ error: error || '视频生成失败' }, { status: 500 });
+                }
+
+                // 每3次打印一次进度（每9-15秒一次）
+                if (i % 3 === 0) {
+                  console.log(`[VolcEngine Video] Poll ${i + 1}, status: ${status}, elapsed: ${(i + 1) * 3}s`);
+                }
+              } catch {
+                // 静默处理网络错误
+              }
+            }
+
+            return NextResponse.json({ error: '视频生成超时，请稍后重试' }, { status: 504 });
+          } else {
+            console.log(`[VolcEngine Video] No taskId found in response:`, JSON.stringify(customData).slice(0, 500));
           }
         }
 

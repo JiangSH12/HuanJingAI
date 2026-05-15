@@ -230,7 +230,7 @@ function inferModelType(provider: CustomProviderManifest): 'image' | 'video' | '
   const submitPath = (provider.submit?.path || '').toLowerCase();
 
   // 视频相关关键词检测
-  const videoKeywords = ['video', 'vid', 'animation', 'animate', 'runway', 'pika', 'kling-video', 'hunyuan-video'];
+  const videoKeywords = ['video', 'vid', 'animation', 'animate', 'runway', 'pika', 'kling-video', 'hunyuan-video', 'seedance', 'doubao-seedance'];
   if (videoKeywords.some(k => name.includes(k) || submitPath.includes(k))) {
     return 'video';
   }
@@ -260,11 +260,23 @@ function inferModelType(provider: CustomProviderManifest): 'image' | 'video' | '
 export function inferApiFormat(
   provider: CustomProviderManifest,
   baseUrl: string
-): 'openai' | 'kling' | 'dashscope' {
+): 'openai' | 'kling' | 'dashscope' | 'volcengine' {
   const name = (provider.name || '').toLowerCase();
   const submitPath = (provider.submit?.path || '').toLowerCase();
   const pollPath = (provider.poll?.path || '').toLowerCase();
   const domain = (baseUrl || '').toLowerCase();
+
+  // === Volcengine / 火山引擎 检测 ===
+  const volcenginePaths = ['contents/generations/tasks'];
+  const volcengineDomains = ['volces.com', 'volcengine.com'];
+  const volcengineKeywords = ['seedance', 'doubao-seedance', 'volcengine', '火山'];
+  if (
+    volcenginePaths.some(p => submitPath.includes(p) || pollPath.includes(p)) ||
+    volcengineDomains.some(d => domain.includes(d)) ||
+    volcengineKeywords.some(k => name.includes(k))
+  ) {
+    return 'volcengine';
+  }
 
   // === DashScope 检测 ===
   const dashscopePaths = ['services/aigc', 'dashscope', 'wan2.', 'happyhorse'];
@@ -336,6 +348,8 @@ export function manifestToEntries(manifest: ApiManifest): ParsedApiEntry[] {
       warnings.push(`已自动识别为 DashScope 格式适配器`);
     } else if (inferredFormat === 'kling') {
       warnings.push(`已自动识别为可灵(Kling)格式适配器`);
+    } else if (inferredFormat === 'volcengine') {
+      warnings.push(`已自动识别为火山引擎(Volcengine)格式适配器`);
     }
 
     entries.push({

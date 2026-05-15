@@ -18,7 +18,7 @@ export interface SystemApiConfig {
   apiKey: string;          // Server-side key (masked in UI)
   apiKeyPreview: string;   // e.g. "sk-...abc"
   type: 'image' | 'video' | 'text'; // What this API generates
-  apiFormat: 'openai' | 'kling' | 'dashscope'; // API format, default 'openai'
+  apiFormat: 'openai' | 'kling' | 'dashscope' | 'volcengine'; // API format, default 'openai'
   creditsPerUse: number;   // Credits consumed per generation
   isActive: boolean;
   sortOrder: number;

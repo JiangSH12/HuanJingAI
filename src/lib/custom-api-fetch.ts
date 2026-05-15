@@ -43,6 +43,13 @@ export function buildCustomApiHeaders(apiKey: string, apiFormat?: string): Recor
       'Authorization': `Bearer ${apiKey}`,
     };
   }
+  // 火山引擎 (Volcengine / Ark) 使用 Bearer token 鉴权
+  if (apiFormat === 'volcengine') {
+    return {
+      ...STANDARD_HEADERS,
+      'Authorization': `Bearer ${apiKey}`,
+    };
+  }
   return {
     ...STANDARD_HEADERS,
     'Authorization': `Bearer ${apiKey}`,

@@ -433,9 +433,11 @@ export function SmartApiConfigDialog({ open, onOpenChange }: SmartApiConfigDialo
 
                     // 格式标签
                     const formatLabel = entry.inferredFormat === 'dashscope' ? 'DashScope' :
-                                       entry.inferredFormat === 'kling' ? '可灵(Kling)' : 'OpenAI 兼容';
+                                       entry.inferredFormat === 'kling' ? '可灵(Kling)' :
+                                       entry.inferredFormat === 'volcengine' ? '火山引擎(Volcengine)' : 'OpenAI 兼容';
                     const formatColor = entry.inferredFormat === 'dashscope' ? 'text-green-600 dark:text-green-400 border-green-500/50' :
                                       entry.inferredFormat === 'kling' ? 'text-purple-600 dark:text-purple-400 border-purple-500/50' :
+                                      entry.inferredFormat === 'volcengine' ? 'text-orange-600 dark:text-orange-400 border-orange-500/50' :
                                       'text-blue-600 dark:text-blue-400 border-blue-500/50';
 
                     return (

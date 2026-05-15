@@ -116,7 +116,7 @@ function ApiManagementTab() {
   const [formModelName, setFormModelName] = useState('');
   const [formApiKey, setFormApiKey] = useState('');
   const [formType, setFormType] = useState<'image' | 'video' | 'text'>('image');
-  const [formApiFormat, setFormApiFormat] = useState<'openai' | 'kling' | 'dashscope'>('openai');
+  const [formApiFormat, setFormApiFormat] = useState<'openai' | 'kling' | 'dashscope' | 'volcengine'>('openai');
   const [formCredits, setFormCredits] = useState('10');
 
   const resetForm = () => {
@@ -255,12 +255,13 @@ function ApiManagementTab() {
             </div>
             <div className="space-y-2">
               <Label>API 格式</Label>
-              <Select value={formApiFormat} onValueChange={v => setFormApiFormat(v as 'openai' | 'kling' | 'dashscope')}>
+              <Select value={formApiFormat} onValueChange={v => setFormApiFormat(v as 'openai' | 'kling' | 'dashscope' | 'volcengine')}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="openai">OpenAI 兼容</SelectItem>
                   <SelectItem value="dashscope">DashScope (通义万相)</SelectItem>
                   <SelectItem value="kling">可灵 (Kling)</SelectItem>
+                  <SelectItem value="volcengine">火山引擎 (Volcengine)</SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground">选择 API 提供商的请求格式，wan2.1/wan2.7 系列选 DashScope</p>

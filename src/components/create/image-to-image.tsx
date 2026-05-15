@@ -25,7 +25,7 @@ import {
   resolveImageSize,
   resolveCustomApiImageSize,
 } from '@/lib/model-config';
-import { Sparkles, Loader2, Download, Upload, Wand2, Image as ImageIcon, History, ChevronDown, ChevronUp, Plus, X, KeyRound, Share2 } from 'lucide-react';
+import { Sparkles, Loader2, Download, Wand2, Image as ImageIcon, History, ChevronDown, ChevronUp, Plus, X, KeyRound, Share2, CheckCircle2, Circle } from 'lucide-react';
 import { useCreationHistory, isPlaceholder, shareToGallery, isUrlPublished, type CreationRecord } from '@/lib/creation-history-store';
 import { addCreditRecord } from '@/lib/credit-records-store';
 import { downloadFile } from '@/lib/utils';
@@ -38,6 +38,18 @@ interface RefImage {
   id: string;
   dataUrl: string;
   name: string;
+}
+
+// Task types
+interface ImageTask {
+  id: string;
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  results: string[];
+  error?: string;
+  prompt: string;
+  negativePrompt?: string;
+  modelLabel: string;
+  timestamp: number;
 }
 
 export function ImageToImagePanel() {
@@ -56,8 +68,10 @@ export function ImageToImagePanel() {
 
   // Generation state
   const [generating, setGenerating] = useState(false);
-  const [results, setResults] = useState<string[]>([]);
   const [optimizing, setOptimizing] = useState(false);
+
+  // Tasks queue state
+  const [tasks, setTasks] = useState<ImageTask[]>([]);
 
   // History
   const { records, add: addRecord } = useCreationHistory();
@@ -111,6 +125,19 @@ export function ImageToImagePanel() {
     }
     return 'AI模型';
   }, [selectedModel, imageKeys, systemImageApis]);
+
+  // Helper to update task status
+  const updateTask = useCallback((taskId: string, updates: Partial<ImageTask>) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+  }, []);
+
+  // Remove task
+  const removeTask = useCallback((taskId: string) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+  }, []);
+
+  // Helper to generate a unique task ID
+  const generateTaskId = () => `img2img-task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   // Prompt optimization
   const handleOptimizePrompt = useCallback(async () => {
@@ -168,53 +195,14 @@ export function ImageToImagePanel() {
 
   const credits = calcImageCredits(selectedModel, resolution, aspectRatio, count);
 
-  // Generate
-  const handleGenerate = useCallback(async () => {
-    if (!prompt.trim()) { toast.error('请输入创作描述'); return; }
-    if (!user) { toast.error('请先登录'); return; }
-    if (refImages.length === 0) { toast.error('请至少上传一张参考图片'); return; }
+  // Execute image generation request
+  const executeGeneration = useCallback(async (task: ImageTask, requestBody: Record<string, unknown>, taskCredits: number) => {
+    updateTask(task.id, { status: 'generating' });
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 300_000);
 
-    setGenerating(true);
     try {
-      // Send first reference image as primary, others as additional context
-      const primaryImage = refImages[0].dataUrl;
-      // Use API-compatible sizes for custom/system/siliconflow models
-      const useCustomApiSize = isCustomModel(selectedModel) || isSystemModel(selectedModel) || isSiliconFlowDefault(selectedModel);
-      const resolvedSize = aspectRatio === 'original'
-        ? undefined
-        : useCustomApiSize
-          ? resolveCustomApiImageSize(aspectRatio)
-          : resolveImageSize(aspectRatio, resolution);
-
-      let requestBody: Record<string, unknown> = {
-        prompt: prompt.trim(),
-        negativePrompt: negativePrompt.trim() || undefined,
-        model: selectedModel,
-        aspectRatio,
-        resolution,
-        size: resolvedSize,
-        count,
-        strength,
-        image: primaryImage,
-        // Additional reference images (beyond the first one)
-        extraImages: refImages.length > 1 ? refImages.slice(1).map(img => img.dataUrl) : undefined,
-      };
-
-      if (isCustomModel(selectedModel)) {
-        const key = imageKeys.find(k => k.id === getCustomKeyId(selectedModel));
-        if (key) {
-          requestBody = { ...requestBody, model: key.modelName, customApiConfig: { apiUrl: key.apiUrl, modelName: key.modelName, apiKey: key.apiKey, apiFormat: key.apiFormat } };
-        }
-      } else if (isSystemModel(selectedModel)) {
-        const api = systemImageApis.find(a => a.id === getSystemApiId(selectedModel));
-        if (api) {
-          requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey, apiFormat: (api as Record<string, unknown>).apiFormat as string | undefined } };
-        }
-      }
-      // siliconflow-default 不传 customApiConfig，让后端使用默认配置
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 300_000);
       const res = await fetch('/api/generate/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -231,39 +219,105 @@ export function ImageToImagePanel() {
 
       const data = await res.json();
       if (data.images && data.images.length > 0) {
-        setResults(data.images);
+        updateTask(task.id, { status: 'completed', results: data.images });
         for (const url of data.images) {
           addRecord({
-            type: 'image', url, prompt: prompt.trim(),
-            negativePrompt: negativePrompt.trim() || undefined,
-            model: selectedModel,
-            modelLabel: getCurrentModelLabel(),
-            isCustomModel: isCustomModel(selectedModel) || isSystemModel(selectedModel) || isSiliconFlowDefault(selectedModel),
+            type: 'image', url, prompt: task.prompt,
+            negativePrompt: task.negativePrompt,
+            model: requestBody.model as string || 'unknown',
+            modelLabel: task.modelLabel,
+            isCustomModel: isCustomModel(requestBody.model as string) || isSystemModel(requestBody.model as string) || isSiliconFlowDefault(requestBody.model as string),
             params: { aspectRatio, resolution, count, strength, refImageCount: refImages.length },
           });
         }
         toast.success(`生成 ${data.images.length} 张图片`);
-        if (credits > 0 && user) {
+        if (taskCredits > 0 && user) {
           const currentCredits = typeof user.creditsBalance === 'number' ? user.creditsBalance : 0;
           addCreditRecord({
             type: 'consume',
-            amount: -credits,
-            balanceAfter: Math.max(0, currentCredits - credits),
-            description: `图生图 - ${getCurrentModelLabel()}`,
+            amount: -taskCredits,
+            balanceAfter: Math.max(0, currentCredits - taskCredits),
+            description: `图生图 - ${task.modelLabel}`,
           });
         }
       } else {
-        toast.error(data.error || '图片生成失败');
+        throw new Error(data.error || '图片生成失败');
       }
     } catch (err: unknown) {
+      clearTimeout(timeoutId);
+      let errorMsg = '生成失败';
       if (err instanceof DOMException && err.name === 'AbortError') {
-        toast.error('请求超时，请尝试减少生成数量或降低分辨率');
-      } else {
-        toast.error(err instanceof Error ? err.message : '网络错误，请重试');
+        errorMsg = '请求超时，请尝试减少生成数量或降低分辨率';
+      } else if (err instanceof Error) {
+        errorMsg = err.message;
+      }
+      updateTask(task.id, { status: 'failed', error: errorMsg });
+      toast.error(errorMsg);
+    }
+  }, [updateTask, addRecord, user, aspectRatio, resolution, count, strength, refImages]);
+
+  // Generate
+  const handleGenerate = useCallback(async () => {
+    if (!prompt.trim()) { toast.error('请输入创作描述'); return; }
+    if (!user) { toast.error('请先登录'); return; }
+    if (refImages.length === 0) { toast.error('请至少上传一张参考图片'); return; }
+    if (generating) { toast.error('正在提交任务，请稍候'); return; }
+
+    const currentCredits = calcImageCredits(selectedModel, resolution, aspectRatio, count);
+    const modelLabel = getCurrentModelLabel();
+
+    // Create task immediately
+    const taskId = generateTaskId();
+    const newTask: ImageTask = {
+      id: taskId,
+      status: 'pending',
+      results: [],
+      prompt: prompt.trim(),
+      negativePrompt: negativePrompt.trim() || undefined,
+      modelLabel,
+      timestamp: Date.now(),
+    };
+
+    setTasks(prev => [newTask, ...prev]);
+
+    // Send first reference image as primary, others as additional context
+    const primaryImage = refImages[0].dataUrl;
+    // Use API-compatible sizes for custom/system/siliconflow models
+    const useCustomApiSize = isCustomModel(selectedModel) || isSystemModel(selectedModel) || isSiliconFlowDefault(selectedModel);
+    const resolvedSize = aspectRatio === 'original'
+      ? undefined
+      : useCustomApiSize
+        ? resolveCustomApiImageSize(aspectRatio)
+        : resolveImageSize(aspectRatio, resolution);
+
+    let requestBody: Record<string, unknown> = {
+      prompt: prompt.trim(),
+      negativePrompt: negativePrompt.trim() || undefined,
+      model: selectedModel,
+      aspectRatio,
+      resolution,
+      size: resolvedSize,
+      count,
+      strength,
+      image: primaryImage,
+      extraImages: refImages.length > 1 ? refImages.slice(1).map(img => img.dataUrl) : undefined,
+    };
+
+    if (isCustomModel(selectedModel)) {
+      const key = imageKeys.find(k => k.id === getCustomKeyId(selectedModel));
+      if (key) {
+        requestBody = { ...requestBody, model: key.modelName, customApiConfig: { apiUrl: key.apiUrl, modelName: key.modelName, apiKey: key.apiKey, apiFormat: key.apiFormat } };
+      }
+    } else if (isSystemModel(selectedModel)) {
+      const api = systemImageApis.find(a => a.id === getSystemApiId(selectedModel));
+      if (api) {
+        requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey, apiFormat: (api as unknown as Record<string, unknown>).apiFormat as string | undefined } };
       }
     }
-    finally { setGenerating(false); }
-  }, [prompt, negativePrompt, selectedModel, aspectRatio, resolution, count, strength, refImages, user, imageKeys, systemImageApis, getCurrentModelLabel, addRecord]);
+
+    // Execute generation asynchronously - don't block UI
+    executeGeneration(newTask, requestBody, currentCredits).finally(() => {});
+  }, [prompt, negativePrompt, selectedModel, aspectRatio, resolution, count, strength, refImages, user, imageKeys, systemImageApis, getCurrentModelLabel, executeGeneration]);
 
   const handleDownload = useCallback(async (url: string, index: number) => {
     const result = await downloadFile(url, `miaojing-img2img-${Date.now()}-${index}.png`);
@@ -442,30 +496,97 @@ export function ImageToImagePanel() {
         </div>
 
         {/* Generate */}
-        <Button className="w-full gap-2" size="lg" onClick={handleGenerate} disabled={generating || !hasModels}>
-          {generating ? (<><Loader2 className="h-4 w-4 animate-spin" />生成中...</>) : (<><Sparkles className="h-4 w-4" />生成图片 {credits > 0 && `(${credits} 积分)`}</>)}
+        <Button className="w-full gap-2" size="lg" onClick={handleGenerate} disabled={!hasModels}>
+          {generating ? (<><Loader2 className="h-4 w-4 animate-spin" />提交中...</>) : (<><Sparkles className="h-4 w-4" />生成图片 {credits > 0 && `(${credits} 积分)`}</>)}
         </Button>
       </div>
 
       {/* Right: Results + History */}
       <div className="flex-1 min-w-0 space-y-4">
-        {results.length > 0 ? (
+        {/* Tasks area */}
+        {tasks.length > 0 ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium"><ImageIcon className="h-4 w-4" />生成结果</div>
-            <div className="grid grid-cols-2 gap-3">
-              {results.map((url, i) => (
-                <div key={i} className="group relative rounded-lg border border-border overflow-hidden bg-muted/50">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={url}
-                    alt={`生成结果 ${i + 1}`}
-                    className="w-full aspect-square object-cover cursor-zoom-in"
-                    onDoubleClick={() => setLightboxSrc(url)}
-                  />
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-                    <Button size="sm" variant="secondary" className="gap-1" onClick={() => setLightboxSrc(url)}><ImageIcon className="h-3.5 w-3.5" />预览</Button>
-                    <Button size="sm" variant="secondary" className="gap-1" onClick={() => handleShareToGallery(url)}><Share2 className="h-3.5 w-3.5" />分享</Button>
-                    <Button size="sm" variant="secondary" className="gap-1" onClick={() => handleDownload(url, i)}><Download className="h-3.5 w-3.5" />下载</Button>
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <ImageIcon className="h-4 w-4" />生成任务 ({tasks.length})
+            </div>
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <div key={task.id} className="rounded-lg border border-border overflow-hidden bg-card">
+                  {/* Task header */}
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      {task.status === 'completed' ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : task.status === 'failed' ? (
+                        <X className="h-4 w-4 text-destructive" />
+                      ) : task.status === 'generating' ? (
+                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="text-xs font-medium">
+                        {task.status === 'completed' ? '已完成' : task.status === 'failed' ? '失败' : task.status === 'generating' ? '生成中' : '等待中'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{task.modelLabel}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => removeTask(task.id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Task content */}
+                  <div className="p-3">
+                    {/* Generating/pending/failed state */}
+                    {(task.status === 'generating' || task.status === 'pending') && (
+                      <div className="aspect-square bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 animate-pulse rounded-md flex items-center justify-center">
+                        <div className="text-center space-y-2">
+                          <Loader2 className="h-8 w-8 mx-auto text-primary animate-spin" />
+                          <p className="text-xs text-muted-foreground">
+                            {task.status === 'generating' ? '图片生成中...' : '等待生成...'}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Failed state */}
+                    {task.status === 'failed' && (
+                      <div className="aspect-square bg-destructive/10 rounded-md flex items-center justify-center">
+                        <div className="text-center space-y-2">
+                          <X className="h-8 w-8 mx-auto text-destructive" />
+                          <p className="text-xs text-destructive">{task.error || '生成失败'}</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Results */}
+                    {task.status === 'completed' && task.results.length > 0 && (
+                      <div className="grid grid-cols-2 gap-2">
+                        {task.results.map((url, i) => (
+                          <div key={i} className="group relative rounded-md border border-border overflow-hidden bg-muted/50">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={url}
+                              alt={`生成结果 ${i + 1}`}
+                              className="w-full aspect-square object-cover cursor-zoom-in"
+                              onDoubleClick={() => setLightboxSrc(url)}
+                            />
+                            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-1 opacity-0 group-hover:opacity-100">
+                              <Button size="sm" variant="secondary" className="gap-1 h-7" onClick={() => setLightboxSrc(url)}><ImageIcon className="h-3 w-3" /></Button>
+                              <Button size="sm" variant="secondary" className="gap-1 h-7" onClick={() => handleShareToGallery(url)}><Share2 className="h-3 w-3" /></Button>
+                              <Button size="sm" variant="secondary" className="gap-1 h-7" onClick={() => handleDownload(url, i)}><Download className="h-3 w-3" /></Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Prompt */}
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground line-clamp-2">{task.prompt}</p>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -474,7 +595,8 @@ export function ImageToImagePanel() {
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-muted-foreground rounded-lg border border-dashed border-border min-h-[300px]">
             <ImageIcon className="h-14 w-14 mb-3 opacity-20" />
-            <p className="text-sm">生成结果将显示在这里</p>
+            <p className="text-sm">点击左侧「生成图片」开始创作</p>
+            <p className="text-xs mt-1 opacity-60">可以同时创建多个任务</p>
           </div>
         )}
 

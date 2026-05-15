@@ -13,7 +13,7 @@ export interface CustomApiKey {
   apiKey: string;        // 完整密钥，仅本地存储
   apiKeyPreview: string; // 脱敏预览
   type: 'image' | 'video' | 'text'; // 模型类型：生图模型 / 视频模型 / 文本模型
-  apiFormat: 'openai' | 'kling' | 'dashscope'; // API 格式类型，默认 'openai'
+  apiFormat: 'openai' | 'kling' | 'dashscope' | 'volcengine'; // API 格式类型，默认 'openai'
   /** 可灵专用：accessKey（与 secretKey 组合使用） */
   accessKey?: string;
   /** 可灵专用：secretKey（与 accessKey 组合使用） */

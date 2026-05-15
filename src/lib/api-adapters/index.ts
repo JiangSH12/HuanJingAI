@@ -10,6 +10,7 @@ import type { ApiAdapter, ApiFormat } from './types';
 import { openaiAdapter } from './openai';
 import { klingAdapter } from './kling';
 import { dashscopeAdapter } from './dashscope';
+import { volcengineAdapter } from './volcengine';
 
 // 重新导出 dashscope 工具函数
 export {
@@ -20,11 +21,20 @@ export {
   extractVideoTaskStatus,
 } from './dashscope';
 
+// 重新导出 volcengine 工具函数
+export {
+  buildVolcEngineVideoSubmitUrl,
+  buildVolcEnginePollUrl,
+  extractVolcEngineTaskId,
+  extractVolcEngineTaskStatus,
+} from './volcengine';
+
 /** 适配器注册表 */
 const ADAPTERS_MAP: Record<ApiFormat, ApiAdapter> = {
   openai: openaiAdapter,
   kling: klingAdapter,
   dashscope: dashscopeAdapter,
+  volcengine: volcengineAdapter,
 };
 
 /**
@@ -47,6 +57,7 @@ export function getSupportedFormats(): { value: ApiFormat; label: string }[] {
     { value: 'openai', label: 'OpenAI 兼容' },
     { value: 'kling', label: '可灵 (Kling)' },
     { value: 'dashscope', label: 'DashScope (通义万相)' },
+    { value: 'volcengine', label: '火山引擎 (Volcengine)' },
   ];
 }
 

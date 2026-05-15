@@ -5,6 +5,7 @@ import { buildCustomApiHeaders, fetchWithRetry, parseCustomApiError } from '@/li
 import { resolveCustomApiImageSize } from '@/lib/model-config';
 import { getAdapter } from '@/lib/api-adapters';
 import { buildDashScopeGenerationUrl } from '@/lib/api-adapters/dashscope';
+import { buildVolcEngineImageUrl } from '@/lib/api-adapters/volcengine';
 import type { ImageAdapterParams } from '@/lib/api-adapters/types';
 
 // 硅基流动默认配置
@@ -229,6 +230,48 @@ export async function POST(request: NextRequest) {
 
           console.error('[DashScope Image] No images in response:', JSON.stringify(data).slice(0, 500));
           return NextResponse.json({ error: 'DashScope 未返回图片', raw: data }, { status: 502 });
+        }
+
+        // ---- Volcengine (火山引擎) 图片生成模式 ----
+        if (customApiConfig.apiFormat === 'volcengine') {
+          const volcUrl = buildVolcEngineImageUrl(customApiConfig.apiUrl);
+          const volcHeaders = buildCustomApiHeaders(customApiConfig.apiKey, customApiConfig.apiFormat);
+
+          console.log('[VolcEngine Image] URL:', volcUrl, '| model:', customApiConfig.modelName, '| hasImage:', !!image);
+
+          let volcResponse: Response;
+          try {
+            volcResponse = await fetchWithRetry(
+              volcUrl,
+              { method: 'POST', headers: volcHeaders, body: JSON.stringify(requestBody) },
+              GENERATION_TIMEOUT,
+              1,
+            );
+          } catch (fetchError: unknown) {
+            if (fetchError instanceof DOMException && fetchError.name === 'AbortError') {
+              return NextResponse.json({ error: '火山引擎 API 请求超时（120秒）' }, { status: 504 });
+            }
+            const msg = fetchError instanceof Error ? fetchError.message : '请求失败';
+            return NextResponse.json({ error: `火山引擎 API 网络错误: ${msg}` }, { status: 502 });
+          }
+
+          if (!volcResponse.ok) {
+            const errorText = await volcResponse.text();
+            console.error('[VolcEngine Error]', volcResponse.status, errorText.slice(0, 500));
+            return NextResponse.json({ error: parseCustomApiError(volcResponse.status, errorText) }, { status: volcResponse.status });
+          }
+
+          const volcData = await volcResponse.json() as Record<string, unknown>;
+          const volcImages = adapter.parseImageResponse(volcData);
+
+          if (volcImages.length > 0) {
+            const persistedImages = await persistAllMediaUrls(volcImages, 'generated/images');
+            console.log('[VolcEngine Image] Success, images:', volcImages.length);
+            return NextResponse.json({ images: persistedImages });
+          }
+
+          console.error('[VolcEngine Image] No images in response:', JSON.stringify(volcData).slice(0, 500));
+          return NextResponse.json({ error: '火山引擎未返回图片', raw: volcData }, { status: 502 });
         }
 
         // ---- 同步模式 (openai/kling) ----

@@ -114,11 +114,11 @@ export interface ParsedApiEntry {
   /** 模型类型 - 根据 manifest 结构推断 */
   type: 'image' | 'video' | 'text';
   /** API 格式 - 统一标记为 manifest */
-  apiFormat: 'openai' | 'kling' | 'dashscope' | 'manifest';
+  apiFormat: 'openai' | 'kling' | 'dashscope' | 'volcengine' | 'manifest';
   /** 原始 manifest 数据（用于后续适配器扩展） */
   manifest: CustomProviderManifest;
   /** 解析警告信息（如 baseUrl 为空等） */
   warnings?: string[];
   /** 推断的 API 格式（用于导入时选择正确的适配器） */
-  inferredFormat: 'openai' | 'kling' | 'dashscope';
+  inferredFormat: 'openai' | 'kling' | 'dashscope' | 'volcengine';
 }

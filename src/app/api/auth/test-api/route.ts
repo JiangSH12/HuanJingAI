@@ -36,12 +36,18 @@ export async function POST(request: NextRequest) {
       const adapter = getAdapter(apiFormat);
       const testReq = adapter.buildTestRequest({ apiUrl, modelName: modelName || '', apiKey });
 
-      // DashScope 格式需要特殊请求头
+      // 不同格式需要不同的鉴权请求头
       let headers: Record<string, string>;
       if (apiFormat === 'dashscope' && testReq.headers) {
         headers = {
           ...testReq.headers,
           'Authorization': `Bearer ${apiKey}`,
+        };
+      } else if (apiFormat === 'volcengine') {
+        // 火山引擎：合并适配器返回的 headers 和鉴权
+        headers = {
+          ...buildCustomApiHeaders(apiKey, apiFormat),
+          ...(testReq.headers || {}),
         };
       } else {
         headers = buildCustomApiHeaders(apiKey, apiFormat);

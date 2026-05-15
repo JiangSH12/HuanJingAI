@@ -21,13 +21,25 @@ import {
   buildSystemModelId,
   calcVideoCredits,
 } from '@/lib/model-config';
-import { Sparkles, Loader2, Download, Upload, Wand2, Film, History, ChevronDown, ChevronUp, Plus, X, KeyRound, Share2 } from 'lucide-react';
+import { Sparkles, Loader2, Download, Upload, Wand2, Film, History, ChevronDown, ChevronUp, X, KeyRound, Share2, CheckCircle2, Circle } from 'lucide-react';
 import { useCreationHistory, isPlaceholder, shareToGallery, isUrlPublished, type CreationRecord } from '@/lib/creation-history-store';
 import { addCreditRecord } from '@/lib/credit-records-store';
 import { downloadFile } from '@/lib/utils';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { CreationDetailDialog } from '@/components/creation-detail-dialog';
+
+// Task types
+interface VideoTask {
+  id: string;
+  status: 'pending' | 'generating' | 'completed' | 'failed';
+  results: string[];
+  error?: string;
+  prompt: string;
+  negativePrompt?: string;
+  modelLabel: string;
+  timestamp: number;
+}
 
 export function ImageToVideoPanel() {
   const { user } = useAuth();
@@ -43,9 +55,10 @@ export function ImageToVideoPanel() {
   const [referencePreview, setReferencePreview] = useState<string | null>(null);
 
   const [generating, setGenerating] = useState(false);
-  const [results, setResults] = useState<string[]>([]);
-  const [generatingPlaceholder, setGeneratingPlaceholder] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
+
+  // Tasks queue state
+  const [tasks, setTasks] = useState<VideoTask[]>([]);
 
   const { records, add: addRecord } = useCreationHistory();
   const [showHistory, setShowHistory] = useState(false);
@@ -92,6 +105,19 @@ export function ImageToVideoPanel() {
     }
     return 'AI模型';
   }, [selectedModel, videoKeys, systemVideoApis]);
+
+  // Helper to update task status
+  const updateTask = useCallback((taskId: string, updates: Partial<VideoTask>) => {
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, ...updates } : t));
+  }, []);
+
+  // Remove task
+  const removeTask = useCallback((taskId: string) => {
+    setTasks(prev => prev.filter(t => t.id !== taskId));
+  }, []);
+
+  // Helper to generate a unique task ID
+  const generateTaskId = () => `img2vid-task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
   const handleOptimizePrompt = useCallback(async () => {
     if (!prompt.trim()) { toast.error('请先输入视频描述'); return; }
@@ -140,36 +166,11 @@ export function ImageToVideoPanel() {
 
   const credits = calcVideoCredits(duration, selectedModel);
 
-  const handleGenerate = useCallback(async () => {
-    if (!user) { toast.error('请先登录'); return; }
-    if (!referenceImage && !prompt.trim()) { toast.error('请上传参考图片或输入视频描述'); return; }
-
-    setGenerating(true);
-    setGeneratingPlaceholder(true);
+  // Execute video generation request
+  const executeGeneration = useCallback(async (task: VideoTask, requestBody: Record<string, unknown>, taskCredits: number) => {
+    updateTask(task.id, { status: 'generating' });
+    
     try {
-      let requestBody: Record<string, unknown> = {
-        prompt: prompt.trim() || undefined,
-        negativePrompt: negativePrompt.trim() || undefined,
-        model: selectedModel,
-        aspectRatio,
-        duration: Number(duration),
-        fps: 30,
-        image: referenceImage,
-      };
-
-      if (isCustomModel(selectedModel)) {
-        const key = videoKeys.find(k => k.id === getCustomKeyId(selectedModel));
-        if (key) {
-          requestBody = { ...requestBody, model: key.modelName, customApiConfig: { apiUrl: key.apiUrl, modelName: key.modelName, apiKey: key.apiKey, apiFormat: key.apiFormat } };
-        }
-      } else if (isSystemModel(selectedModel)) {
-        const api = systemVideoApis.find(a => a.id === getSystemApiId(selectedModel));
-        if (api) {
-          requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey, apiFormat: api.apiFormat } };
-        }
-      }
-      // siliconflow-default 不传 customApiConfig，让后端使用默认配置
-
       const res = await fetch('/api/generate/video', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -177,7 +178,6 @@ export function ImageToVideoPanel() {
       });
 
       if (!res.ok) {
-        setGeneratingPlaceholder(false);
         let errorMsg = `请求失败 (${res.status})`;
         try { const errData = await res.json(); if (errData.error) errorMsg = errData.error; } catch { /* ignore */ }
         throw new Error(errorMsg);
@@ -185,42 +185,89 @@ export function ImageToVideoPanel() {
 
       const data = await res.json();
       if (data.videos && data.videos.length > 0) {
-        setGeneratingPlaceholder(false);
-        setResults(data.videos);
+        updateTask(task.id, { status: 'completed', results: data.videos });
         for (const url of data.videos) {
           addRecord({
-            type: 'video', url, prompt: prompt.trim(),
-            negativePrompt: negativePrompt.trim() || undefined,
-            model: selectedModel,
-            modelLabel: getCurrentModelLabel(),
-            isCustomModel: isCustomModel(selectedModel) || isSystemModel(selectedModel) || isSiliconFlowDefault(selectedModel),
+            type: 'video', url, prompt: task.prompt,
+            negativePrompt: task.negativePrompt,
+            model: requestBody.model as string || 'unknown',
+            modelLabel: task.modelLabel,
+            isCustomModel: isCustomModel(requestBody.model as string) || isSystemModel(requestBody.model as string) || isSiliconFlowDefault(requestBody.model as string),
             params: { aspectRatio, duration, cameraMovement },
           });
         }
         toast.success('视频生成成功');
-        if (credits > 0 && user) {
+        if (taskCredits > 0 && user) {
           const currentCredits = typeof user.creditsBalance === 'number' ? user.creditsBalance : 0;
           addCreditRecord({
             type: 'consume',
-            amount: -credits,
-            balanceAfter: Math.max(0, currentCredits - credits),
-            description: `图生视频 - ${getCurrentModelLabel()}`,
+            amount: -taskCredits,
+            balanceAfter: Math.max(0, currentCredits - taskCredits),
+            description: `图生视频 - ${task.modelLabel}`,
           });
         }
       } else {
-        setGeneratingPlaceholder(false);
-        toast.error(data.error || '视频生成失败');
+        throw new Error(data.error || '视频生成失败');
       }
     } catch (err: unknown) {
-      setGeneratingPlaceholder(false);
+      let errorMsg = '生成失败';
       if (err instanceof DOMException && err.name === 'AbortError') {
-        toast.error('请求超时，视频生成可能需要更长时间');
-      } else {
-        toast.error(err instanceof Error ? err.message : '网络错误，请重试');
+        errorMsg = '请求超时，视频生成可能需要更长时间';
+      } else if (err instanceof Error) {
+        errorMsg = err.message;
+      }
+      updateTask(task.id, { status: 'failed', error: errorMsg });
+      toast.error(errorMsg);
+    }
+  }, [updateTask, addRecord, user, aspectRatio, duration, cameraMovement]);
+
+  const handleGenerate = useCallback(async () => {
+    if (!user) { toast.error('请先登录'); return; }
+    if (!referenceImage && !prompt.trim()) { toast.error('请上传参考图片或输入视频描述'); return; }
+    if (generating) { toast.error('正在提交任务，请稍候'); return; }
+
+    const currentCredits = calcVideoCredits(duration, selectedModel);
+    const modelLabel = getCurrentModelLabel();
+
+    // Create task immediately
+    const taskId = generateTaskId();
+    const newTask: VideoTask = {
+      id: taskId,
+      status: 'pending',
+      results: [],
+      prompt: prompt.trim(),
+      negativePrompt: negativePrompt.trim() || undefined,
+      modelLabel,
+      timestamp: Date.now(),
+    };
+
+    setTasks(prev => [newTask, ...prev]);
+    
+    let requestBody: Record<string, unknown> = {
+      prompt: prompt.trim() || undefined,
+      negativePrompt: negativePrompt.trim() || undefined,
+      model: selectedModel,
+      aspectRatio,
+      duration: Number(duration),
+      fps: 30,
+      image: referenceImage,
+    };
+
+    if (isCustomModel(selectedModel)) {
+      const key = videoKeys.find(k => k.id === getCustomKeyId(selectedModel));
+      if (key) {
+        requestBody = { ...requestBody, model: key.modelName, customApiConfig: { apiUrl: key.apiUrl, modelName: key.modelName, apiKey: key.apiKey, apiFormat: key.apiFormat } };
+      }
+    } else if (isSystemModel(selectedModel)) {
+      const api = systemVideoApis.find(a => a.id === getSystemApiId(selectedModel));
+      if (api) {
+        requestBody = { ...requestBody, model: api.modelName, customApiConfig: { apiUrl: api.apiUrl, modelName: api.modelName, apiKey: api.apiKey, apiFormat: api.apiFormat } };
       }
     }
-    finally { setGenerating(false); }
-  }, [prompt, negativePrompt, selectedModel, aspectRatio, duration, cameraMovement, referenceImage, user, videoKeys, systemVideoApis, getCurrentModelLabel, addRecord]);
+
+    // Execute generation asynchronously - don't block UI
+    executeGeneration(newTask, requestBody, currentCredits).finally(() => {});
+  }, [prompt, negativePrompt, selectedModel, aspectRatio, duration, cameraMovement, referenceImage, user, videoKeys, systemVideoApis, getCurrentModelLabel, executeGeneration]);
 
   const handleDownload = useCallback(async (url: string, index: number) => {
     const result = await downloadFile(url, `miaojing-img2vid-${Date.now()}-${index}.mp4`);
@@ -370,49 +417,108 @@ export function ImageToVideoPanel() {
           </Select>
         </div>
 
-        <Button className="w-full gap-2" size="lg" onClick={handleGenerate} disabled={generating || !hasModels}>
-          {generating ? (<><Loader2 className="h-4 w-4 animate-spin" />生成中...</>) : (<><Sparkles className="h-4 w-4" />生成视频 {credits > 0 && `(${credits} 积分)`}</>)}
+        <Button className="w-full gap-2" size="lg" onClick={handleGenerate} disabled={!hasModels}>
+          {generating ? (<><Loader2 className="h-4 w-4 animate-spin" />提交中...</>) : (<><Sparkles className="h-4 w-4" />生成视频 {credits > 0 && `(${credits} 积分)`}</>)}
         </Button>
       </div>
 
       {/* Right: Results + History */}
       <div className="flex-1 min-w-0 space-y-4">
-        {results.length > 0 || generatingPlaceholder ? (
+        {/* Tasks area */}
+        {tasks.length > 0 ? (
           <div className="space-y-3">
-            <div className="flex items-center gap-2 text-sm font-medium"><Film className="h-4 w-4" />生成结果</div>
-            {generatingPlaceholder && (
-              <div className="rounded-lg border border-border overflow-hidden bg-muted/50">
-                <div className="relative w-full aspect-video bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 animate-pulse flex items-center justify-center">
-                  <div className="text-center space-y-3">
-                    <div className="relative">
-                      <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin" />
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <Film className="h-5 w-5 text-primary/50" />
-                      </div>
+            <div className="flex items-center gap-2 text-sm font-medium">
+              <Film className="h-4 w-4" />生成任务 ({tasks.length})
+            </div>
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <div key={task.id} className="rounded-lg border border-border overflow-hidden bg-card">
+                  {/* Task header */}
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted/50">
+                    <div className="flex items-center gap-2">
+                      {task.status === 'completed' ? (
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      ) : task.status === 'failed' ? (
+                        <X className="h-4 w-4 text-destructive" />
+                      ) : task.status === 'generating' ? (
+                        <Loader2 className="h-4 w-4 text-primary animate-spin" />
+                      ) : (
+                        <Circle className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <span className="text-xs font-medium">
+                        {task.status === 'completed' ? '已完成' : task.status === 'failed' ? '失败' : task.status === 'generating' ? '生成中' : '等待中'}
+                      </span>
                     </div>
-                    <p className="text-sm text-muted-foreground">视频生成中...</p>
-                    <p className="text-xs text-muted-foreground/60">异步任务可能需要较长时间，请耐心等待</p>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{task.modelLabel}</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 w-6 p-0"
+                        onClick={() => removeTask(task.id)}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  </div>
+                  {/* Task content */}
+                  <div className="p-3">
+                    {/* Generating/pending state */}
+                    {(task.status === 'generating' || task.status === 'pending') && (
+                      <div className="aspect-video bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 animate-pulse rounded-md flex items-center justify-center">
+                        <div className="text-center space-y-3">
+                          <div className="relative">
+                            <Loader2 className="h-12 w-12 mx-auto text-primary animate-spin" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                              <Film className="h-5 w-5 text-primary/50" />
+                            </div>
+                          </div>
+                          <p className="text-sm text-muted-foreground">
+                            {task.status === 'generating' ? '视频生成中...' : '等待生成...'}
+                          </p>
+                          {task.status === 'generating' && (
+                            <p className="text-xs text-muted-foreground/60">异步任务可能需要较长时间，请耐心等待</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                    {/* Failed state */}
+                    {task.status === 'failed' && (
+                      <div className="aspect-video bg-destructive/10 rounded-md flex items-center justify-center">
+                        <div className="text-center space-y-2">
+                          <X className="h-8 w-8 mx-auto text-destructive" />
+                          <p className="text-xs text-destructive">{task.error || '生成失败'}</p>
+                        </div>
+                      </div>
+                    )}
+                    {/* Results */}
+                    {task.status === 'completed' && task.results.length > 0 && (
+                      <div className="space-y-2">
+                        {task.results.map((url, i) => (
+                          <div key={i} className="rounded-md border border-border overflow-hidden bg-muted/50">
+                            <video src={url} controls className="w-full" />
+                            <div className="p-2 flex justify-end gap-2">
+                              <Button size="sm" variant="outline" className="gap-1" onClick={() => handleShareToGallery(url)}><Share2 className="h-3.5 w-3.5" />分享</Button>
+                              <Button size="sm" variant="outline" className="gap-1" onClick={() => handleDownload(url, i)}><Download className="h-3.5 w-3.5" />下载</Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {/* Prompt */}
+                    <div className="mt-2">
+                      <p className="text-xs text-muted-foreground line-clamp-2">{task.prompt || '图生视频'}</p>
+                    </div>
                   </div>
                 </div>
-                <div className="p-3 bg-muted/30">
-                  <p className="text-xs text-muted-foreground line-clamp-1">{prompt || '图生视频'}</p>
-                </div>
-              </div>
-            )}
-            {results.map((url, i) => (
-              <div key={i} className="rounded-lg border border-border overflow-hidden bg-muted/50">
-                <video src={url} controls className="w-full" />
-                <div className="p-2 flex justify-end gap-2">
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => handleShareToGallery(url)}><Share2 className="h-3.5 w-3.5" />分享</Button>
-                  <Button size="sm" variant="outline" className="gap-1" onClick={() => handleDownload(url, i)}><Download className="h-3.5 w-3.5" />下载</Button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center py-24 text-muted-foreground rounded-lg border border-dashed border-border min-h-[300px]">
             <Film className="h-14 w-14 mb-3 opacity-20" />
-            <p className="text-sm">生成结果将显示在这里</p>
+            <p className="text-sm">点击左侧「生成视频」开始创作</p>
+            <p className="text-xs mt-1 opacity-60">可以同时创建多个任务</p>
           </div>
         )}
 

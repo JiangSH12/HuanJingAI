@@ -98,7 +98,7 @@ function ApiKeyManager() {
   const [accessKey, setAccessKey] = useState('');
   const [secretKey, setSecretKey] = useState('');
   const [formType, setFormType] = useState<'image' | 'video' | 'text'>('image');
-  const [formFormat, setFormFormat] = useState<'openai' | 'kling' | 'dashscope'>('openai');
+  const [formFormat, setFormFormat] = useState<'openai' | 'kling' | 'dashscope' | 'volcengine'>('openai');
 
   // Test connection state
   const [testing, setTesting] = useState(false);
@@ -449,7 +449,7 @@ function ApiKeyManager() {
                   <Globe className="h-3.5 w-3.5 text-muted-foreground" />
                   API 格式 <span className="text-destructive">*</span>
                 </Label>
-                <Select value={formFormat} onValueChange={v => setFormFormat(v as 'openai' | 'kling' | 'dashscope')}>
+                <Select value={formFormat} onValueChange={v => setFormFormat(v as 'openai' | 'kling' | 'dashscope' | 'volcengine')}>
                   <SelectTrigger>
                     <SelectValue placeholder="选择 API 格式..." />
                   </SelectTrigger>
@@ -457,9 +457,10 @@ function ApiKeyManager() {
                     <SelectItem value="openai">OpenAI 兼容</SelectItem>
                     <SelectItem value="dashscope">DashScope (通义万相)</SelectItem>
                     <SelectItem value="kling">可灵 (Kling)</SelectItem>
+                    <SelectItem value="volcengine">火山引擎 (Volcengine)</SelectItem>
                   </SelectContent>
                 </Select>
-                <p className="text-xs text-muted-foreground">OpenAI 兼容适用于大部分 API，DashScope 适用于通义万相/wan2.x 系列，可灵适用于可灵官方 API</p>
+                <p className="text-xs text-muted-foreground">OpenAI 兼容适用于大部分 API，DashScope 适用于通义万相/wan2.x 系列，可灵适用于可灵官方 API，火山引擎适用于豆包/Seedance 系列</p>
               </div>
 
               {/* Row 2: Model Name + API Key (OpenAI) / AccessKey + SecretKey (Kling) */}
@@ -627,8 +628,8 @@ function ApiKeyManager() {
                               <span className="flex items-center gap-1"><Image className="h-3 w-3" />生图</span>
                             )}
                           </Badge>
-                          <Badge variant="outline" className={`text-xs ${key.apiFormat === 'kling' ? 'border-purple-500/50 text-purple-600 dark:text-purple-400' : key.apiFormat === 'dashscope' ? 'border-green-500/50 text-green-600 dark:text-green-400' : 'border-blue-500/50 text-blue-600 dark:text-blue-400'}`}>
-                            {key.apiFormat === 'kling' ? '可灵' : key.apiFormat === 'dashscope' ? 'DashScope' : 'OpenAI'}
+                          <Badge variant="outline" className={`text-xs ${key.apiFormat === 'kling' ? 'border-purple-500/50 text-purple-600 dark:text-purple-400' : key.apiFormat === 'dashscope' ? 'border-green-500/50 text-green-600 dark:text-green-400' : key.apiFormat === 'volcengine' ? 'border-orange-500/50 text-orange-600 dark:text-orange-400' : 'border-blue-500/50 text-blue-600 dark:text-blue-400'}`}>
+                            {key.apiFormat === 'kling' ? '可灵' : key.apiFormat === 'dashscope' ? 'DashScope' : key.apiFormat === 'volcengine' ? '火山引擎' : 'OpenAI'}
                           </Badge>
                           <Badge variant="outline" className="font-mono text-xs">
                             {key.apiKeyPreview}
