@@ -1032,7 +1032,7 @@ export function TextToImagePanel() {
                                   size="sm"
                                   variant="secondary"
                                   className="h-8 gap-1"
-                                  onClick={() => handleDownload(panel.imageUrl, panel.index)}
+                                  onClick={() => handleDownload(panel.imageUrl!, panel.index)}
                                 >
                                   <Download className="h-3 w-3" />
                                 </Button>
