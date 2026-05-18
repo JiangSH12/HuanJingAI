@@ -294,10 +294,10 @@ export const dashscopeAdapter: ApiAdapter = {
 
     // 图生图 / 图像编辑：先放图片，再放文本
     if (hasReferenceImage) {
-      content.push({ image: params.image });
+      content.push({ image: params.image! });
       // 额外图片（多图编辑）
-      if ((params as Record<string, unknown>).extraImages) {
-        const extra = (params as Record<string, unknown>).extraImages as string[];
+      if ((params as unknown as Record<string, unknown>).extraImages) {
+        const extra = (params as unknown as Record<string, unknown>).extraImages as string[];
         for (const img of extra) {
           content.push({ image: img });
         }
@@ -359,9 +359,11 @@ export const dashscopeAdapter: ApiAdapter = {
     const parameters: Record<string, unknown> = {};
 
     // 分辨率: 720P / 1080P
-    if (params.resolution) {
-      parameters.resolution = params.resolution.toUpperCase().includes('2K') ? '1080P' :
-        params.resolution.toUpperCase().includes('4K') ? '1080P' : '720P';
+    const videoParams = params as unknown as Record<string, unknown>;
+    if (videoParams.resolution) {
+      const res = videoParams.resolution as string;
+      parameters.resolution = res.toUpperCase().includes('2K') ? '1080P' :
+        res.toUpperCase().includes('4K') ? '1080P' : '720P';
     } else {
       parameters.resolution = '720P';
     }
