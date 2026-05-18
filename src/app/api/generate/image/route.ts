@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { S3Storage } from '@aws-sdk/client-s3';
+import { S3Client } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { buildCustomApiHeaders, fetchWithRetry, parseCustomApiError } from '@/lib/custom-api-fetch';
 import { resolveCustomApiImageSize } from '@/lib/model-config';
@@ -28,7 +28,7 @@ async function persistMediaToStorage(dataUrl: string, prefix: string): Promise<s
     const buffer = Buffer.from(base64Data, 'base64');
     const fileName = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    const s3Client = new S3Storage({});
+    const s3Client = new S3Client({});
     const upload = new Upload({
       client: s3Client,
       params: {
@@ -80,7 +80,7 @@ async function uploadDataUrlAndGetPublicUrl(dataUrl: string): Promise<string | n
     const buffer = Buffer.from(base64Data, 'base64');
     const fileName = `img2img-ref/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    const s3Client = new S3Storage({});
+    const s3Client = new S3Client({});
     const upload = new Upload({
       client: s3Client,
       params: {
