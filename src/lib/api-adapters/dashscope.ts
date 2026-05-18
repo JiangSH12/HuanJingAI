@@ -289,11 +289,8 @@ export const dashscopeAdapter: ApiAdapter = {
   buildImageRequest(params: ImageAdapterParams): Record<string, unknown> {
     const content: Array<Record<string, string>> = [];
 
-    // 判断是文生图还是图生图
-    const hasReferenceImage = !!params.image;
-
     // 图生图 / 图像编辑：先放图片，再放文本
-    if (hasReferenceImage) {
+    if (params.image) {
       content.push({ image: params.image });
       // 额外图片（多图编辑）
       if ((params as Record<string, unknown>).extraImages) {
