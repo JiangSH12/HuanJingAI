@@ -80,6 +80,13 @@ export function TextToImagePanel() {
   const [generating, setGenerating] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
 
+  const triggerGenerateCooldown = useCallback(() => {
+    setGenerating(true);
+    window.setTimeout(() => {
+      setGenerating(false);
+    }, 500);
+  }, []);
+
   // Tasks queue state
   const [tasks, setTasks] = useState<ImageTask[]>([]);
 
@@ -217,6 +224,8 @@ export function TextToImagePanel() {
     if (!prompt.trim()) { toast.error('请输入创作描述'); return; }
     if (!user) { toast.error('请先登录'); return; }
     if (generating) { toast.error('正在提交任务，请稍候'); return; }
+
+    triggerGenerateCooldown();
 
     const currentCredits = calcImageCredits(selectedModel, resolution, aspectRatio, count);
     const modelLabel = getCurrentModelLabel();
@@ -638,9 +647,9 @@ export function TextToImagePanel() {
               </div>
 
               {/* Generate Button */}
-              <Button className="w-full gap-2" size="lg" onClick={handleGenerate} disabled={!hasModels}>
-                {generating ? (<><Loader2 className="h-4 w-4 animate-spin" />提交中...</>) : (<><Sparkles className="h-4 w-4" />生成图片 {credits > 0 && `(${credits} 积分)`}</>)}
-              </Button>
+                <Button className="w-full gap-2" size="lg" onClick={handleGenerate} disabled={!hasModels || generating}>
+                  {generating ? (<><Loader2 className="h-4 w-4 animate-spin" />提交中...</>) : (<><Sparkles className="h-4 w-4" />生成图片 {credits > 0 && `(${credits} 积分)`}</>)}
+                </Button>
             </div>
 
             {/* Right: Results + History (flex-1, takes remaining space) */}

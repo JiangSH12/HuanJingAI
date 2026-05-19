@@ -57,6 +57,13 @@ export function ImageToVideoPanel() {
   const [generating, setGenerating] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
 
+  const triggerGenerateCooldown = useCallback(() => {
+    setGenerating(true);
+    window.setTimeout(() => {
+      setGenerating(false);
+    }, 500);
+  }, []);
+
   // Tasks queue state
   const [tasks, setTasks] = useState<VideoTask[]>([]);
 

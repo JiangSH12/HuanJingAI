@@ -15,16 +15,16 @@ const GENERATION_TIMEOUT = 300_000; // 5分钟
 
 // 动态导入 S3 模块以兼容 Next.js 15 Turbopack
 async function getS3Upload() {
-  const { S3Storage } = await import('@aws-sdk/client-s3');
+  const { S3Client } = await import('@aws-sdk/client-s3');
   const { Upload } = await import('@aws-sdk/lib-storage');
-  return { S3Storage, Upload };
+  return { S3Client, Upload };
 }
 
 async function persistMediaToStorage(dataUrl: string, prefix: string): Promise<string> {
   if (!dataUrl.startsWith('data:')) return dataUrl;
 
   try {
-    const { S3Storage, Upload } = await getS3Upload();
+    const { S3Client, Upload } = await getS3Upload();
     const match = dataUrl.match(/^data:((?:image|video)\/[^;]+);base64,(.+)$/);
     if (!match) return dataUrl;
     const [, mimeType, base64Data] = match;
@@ -32,7 +32,7 @@ async function persistMediaToStorage(dataUrl: string, prefix: string): Promise<s
     const buffer = Buffer.from(base64Data, 'base64');
     const fileName = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    const s3Client = new S3Storage({});
+    const s3Client = new S3Client({});
     const upload = new Upload({
       client: s3Client,
       params: {
@@ -73,7 +73,7 @@ async function persistAllMediaUrls(urls: string[], prefix: string): Promise<stri
 
 async function uploadDataUrlAndGetPublicUrl(dataUrl: string): Promise<string | null> {
   try {
-    const { S3Storage, Upload } = await getS3Upload();
+    const { S3Client, Upload } = await getS3Upload();
     const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
     if (!match) return null;
     const [, mimeType, base64Data] = match;
@@ -81,7 +81,7 @@ async function uploadDataUrlAndGetPublicUrl(dataUrl: string): Promise<string | n
     const buffer = Buffer.from(base64Data, 'base64');
     const fileName = `img2vid-ref/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
 
-    const s3Client = new S3Storage({});
+    const s3Client = new S3Client({});
     const upload = new Upload({
       client: s3Client,
       params: {

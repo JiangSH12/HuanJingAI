@@ -18,12 +18,31 @@ export async function downloadFile(
   url: string,
   filename: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
+  const triggerNativeDownload = (): boolean => {
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = filename;
+      link.target = '_blank';
+      link.rel = 'noopener noreferrer';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      return true;
+    } catch {
+      return false;
+    }
+  };
+
   try {
     const proxyUrl = `/api/download?url=${encodeURIComponent(url)}&filename=${encodeURIComponent(filename)}`;
-    const response = await fetch(proxyUrl);
+    const response = await fetch(proxyUrl, { cache: 'no-store' });
 
     if (!response.ok) {
       const data = await response.json().catch(() => ({ error: '下载失败' }));
+      if (triggerNativeDownload()) {
+        return { ok: true };
+      }
       return { ok: false, error: data.error || '下载失败' };
     }
 
@@ -32,14 +51,20 @@ export async function downloadFile(
     const link = document.createElement('a');
     link.href = blobUrl;
     link.download = filename;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(blobUrl);
+    document.body.removeChild(link);
+    window.setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
     return { ok: true };
   } catch (err) {
+    if (triggerNativeDownload()) {
+      return { ok: true };
+    }
     const msg = err instanceof Error ? err.message : '下载失败';
     return { ok: false, error: msg };
   }
 }
+
 
 /**
  * Safely parse a fetch Response as JSON.

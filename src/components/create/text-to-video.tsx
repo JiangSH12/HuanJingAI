@@ -216,6 +216,8 @@ export function TextToVideoPanel() {
     if (!user) { toast.error('请先登录'); return; }
     if (generating) { toast.error('正在提交任务，请稍候'); return; }
 
+    triggerGenerateCooldown();
+
     const currentCredits = calcVideoCredits(duration, selectedModel);
     const modelLabel = getCurrentModelLabel();
 
