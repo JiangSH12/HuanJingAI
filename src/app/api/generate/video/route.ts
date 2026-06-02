@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { buildCustomApiHeaders, fetchWithRetry, parseCustomApiError } from '@/lib/custom-api-fetch';
 import { getAspectRatioPromptHint } from '@/lib/model-config';
 import { getAdapter, buildDashScopeVideoSynthesisUrl, buildDashScopePollUrl, extractVideoTaskId, extractVideoTaskStatus, buildVolcEngineVideoSubmitUrl, buildVolcEnginePollUrl, extractVolcEngineTaskId, extractVolcEngineTaskStatus } from '@/lib/api-adapters';
+import { uploadDataUrlToMinio } from '@/lib/object-storage';
 import type { VideoAdapterParams } from '@/lib/api-adapters/types';
 
 // 硅基流动默认配置

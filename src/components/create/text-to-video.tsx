@@ -81,6 +81,28 @@ export function TextToVideoPanel() {
   // Helper to generate a unique task ID
   const generateTaskId = () => `video-task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+  const persistWorks = useCallback(async (urls: string[], task: VideoTask, requestBody: Record<string, unknown>, creditsCost: number) => {
+    if (!user || urls.length === 0) return;
+    try {
+      await fetch('/api/works', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          type: 'video',
+          prompt: task.prompt,
+          negativePrompt: task.negativePrompt,
+          resultUrls: urls,
+          duration: Number(requestBody.duration) || undefined,
+          params: { aspectRatio, duration: requestBody.duration, cameraMovement, style },
+          model: requestBody.model,
+          modelLabel: task.modelLabel,
+          creditsCost,
+        }),
+      });
+    } catch { /* 非阻塞 */ }
+  }, [user, aspectRatio, cameraMovement, style]);
+
   // Execute video generation request
   const executeGeneration = useCallback(async (task: VideoTask, requestBody: Record<string, unknown>, credits: number) => {
     updateTask(task.id, { status: 'generating' });
@@ -112,6 +134,8 @@ export function TextToVideoPanel() {
             params: { aspectRatio, duration: requestBody.duration, cameraMovement, style },
           });
         }
+        // Persist works to Supabase
+        await persistWorks(data.videos, task, requestBody, credits);
         // Record credits
         if (credits > 0 && user) {
           const currentCredits = typeof user.creditsBalance === 'number' ? user.creditsBalance : 0;
@@ -136,7 +160,7 @@ export function TextToVideoPanel() {
       updateTask(task.id, { status: 'failed', error: errorMsg });
       toast.error(errorMsg);
     }
-  }, [updateTask, addRecord, user, aspectRatio, cameraMovement, style]);
+  }, [updateTask, addRecord, persistWorks, user, aspectRatio, cameraMovement, style]);
 
   const systemVideoApis = adminConfig.systemApis.filter(api => api.type === 'video' && api.isActive);
   const systemTextApis = adminConfig.systemApis.filter(api => api.type === 'text' && api.isActive);
@@ -210,6 +234,11 @@ export function TextToVideoPanel() {
   }, [prompt, textModelOptions, getCurrentModelLabel]);
 
   const credits = calcVideoCredits(duration, selectedModel);
+
+  const triggerGenerateCooldown = useCallback(() => {
+    setGenerating(true);
+    window.setTimeout(() => setGenerating(false), 500);
+  }, []);
 
   const handleGenerate = useCallback(async () => {
     if (!prompt.trim()) { toast.error('请输入视频描述'); return; }

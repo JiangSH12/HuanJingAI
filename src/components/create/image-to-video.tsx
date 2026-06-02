@@ -159,6 +159,29 @@ export function ImageToVideoPanel() {
     finally { setOptimizing(false); }
   }, [prompt, textModelOptions, getCurrentModelLabel]);
 
+  const persistWorks = useCallback(async (urls: string[], task: VideoTask, requestBody: Record<string, unknown>, taskCredits: number) => {
+    if (!user || urls.length === 0) return;
+    try {
+      await fetch('/api/works', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          type: 'video',
+          prompt: task.prompt,
+          negativePrompt: task.negativePrompt,
+          resultUrls: urls,
+          duration: Number(requestBody.duration) || undefined,
+          referenceImage: typeof requestBody.image === 'string' ? requestBody.image : undefined,
+          params: { aspectRatio, duration, cameraMovement },
+          model: requestBody.model,
+          modelLabel: task.modelLabel,
+          creditsCost: taskCredits,
+        }),
+      });
+    } catch { /* 非阻塞 */ }
+  }, [user, aspectRatio, duration, cameraMovement]);
+
   const handleFileChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -203,6 +226,7 @@ export function ImageToVideoPanel() {
             params: { aspectRatio, duration, cameraMovement },
           });
         }
+        await persistWorks(data.videos, task, requestBody, taskCredits);
         toast.success('视频生成成功');
         if (taskCredits > 0 && user) {
           const currentCredits = typeof user.creditsBalance === 'number' ? user.creditsBalance : 0;
@@ -226,7 +250,7 @@ export function ImageToVideoPanel() {
       updateTask(task.id, { status: 'failed', error: errorMsg });
       toast.error(errorMsg);
     }
-  }, [updateTask, addRecord, user, aspectRatio, duration, cameraMovement]);
+  }, [updateTask, addRecord, persistWorks, user, aspectRatio, duration, cameraMovement]);
 
   const handleGenerate = useCallback(async () => {
     if (!user) { toast.error('请先登录'); return; }

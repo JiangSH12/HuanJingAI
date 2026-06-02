@@ -21,26 +21,7 @@ async function persistMediaToStorage(dataUrl: string, prefix: string): Promise<s
   if (!dataUrl.startsWith('data:')) return dataUrl;
 
   try {
-    const match = dataUrl.match(/^data:((?:image|video)\/[^;]+);base64,(.+)$/);
-    if (!match) return dataUrl;
-    const [, mimeType, base64Data] = match;
-    const ext = mimeType.split('/')[1] || 'png';
-    const buffer = Buffer.from(base64Data, 'base64');
-    const fileName = `${prefix}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-    const s3Client = new S3Client({});
-    const upload = new Upload({
-      client: s3Client,
-      params: {
-        Bucket: process.env.S3_BUCKET || 'media',
-        Key: fileName,
-        Body: buffer,
-        ContentType: mimeType,
-      },
-    });
-
-    await upload.done();
-    return `https://${process.env.S3_BUCKET || 'media'}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${fileName}`;
+    return await uploadDataUrlToMinio(dataUrl, prefix, 'png') || dataUrl;
   } catch (err) {
     console.error('[Persist Media Error]', err instanceof Error ? err.message : err);
     return dataUrl;
@@ -73,26 +54,7 @@ async function persistAllMediaUrls(urls: string[], prefix: string): Promise<stri
 
 async function uploadDataUrlAndGetPublicUrl(dataUrl: string): Promise<string | null> {
   try {
-    const match = dataUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
-    if (!match) return null;
-    const [, mimeType, base64Data] = match;
-    const ext = mimeType.split('/')[1] || 'png';
-    const buffer = Buffer.from(base64Data, 'base64');
-    const fileName = `img2img-ref/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-
-    const s3Client = new S3Client({});
-    const upload = new Upload({
-      client: s3Client,
-      params: {
-        Bucket: process.env.S3_BUCKET || 'media',
-        Key: fileName,
-        Body: buffer,
-        ContentType: mimeType,
-      },
-    });
-
-    await upload.done();
-    return `https://${process.env.S3_BUCKET || 'media'}.s3.${process.env.AWS_REGION || 'us-east-1'}.amazonaws.com/${fileName}`;
+    return await uploadDataUrlToMinio(dataUrl, 'img2img-ref', 'png');
   } catch (err) {
     console.error('[Upload Ref Image Error]', err instanceof Error ? err.message : err);
     return null;

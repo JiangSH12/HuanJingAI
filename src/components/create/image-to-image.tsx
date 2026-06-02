@@ -101,6 +101,7 @@ export function ImageToImagePanel() {
   const [comicSubjectTaskId, setComicSubjectTaskId] = useState<string | null>(null);
   const [generatingStoryboard, setGeneratingStoryboard] = useState(false);
   const [generatingComicSubject, setGeneratingComicSubject] = useState(false);
+  const allComicGeneratingRef = useRef(false);
 
   const [generating, setGenerating] = useState(false);
   const [optimizing, setOptimizing] = useState(false);
@@ -285,6 +286,7 @@ export function ImageToImagePanel() {
             referenceImage: metadata?.referenceImage,
           });
         }
+        await persistWorks(data.images as string[], task, requestBody, taskCredits, metadata);
         toast.success(`生成 ${data.images.length} 张图片`);
         if (taskCredits > 0 && user) {
           const currentCredits = typeof user.creditsBalance === 'number' ? user.creditsBalance : 0;
@@ -574,13 +576,19 @@ export function ImageToImagePanel() {
   }, [user, comicSubjectImage, comicSubjectPrompt, negativePrompt, buildImageRequestBody, refImages, strength, getCurrentModelLabel, executeGeneration, selectedModel, resolution, aspectRatio, comicStoryPrompt, comicSubjectTaskId]);
 
   const generateAllComicPanels = useCallback(async () => {
+    if (allComicGeneratingRef.current) return;
     const pendingPanels = comicPanels.filter(panel => panel.status === 'pending' || panel.status === 'failed');
     if (pendingPanels.length === 0) { toast.info('所有分镜已生成完毕'); return; }
     if (!comicSubjectImage) { toast.error('请先生成漫画主体'); return; }
 
-    for (const panel of pendingPanels) {
-      await generateComicPanelImage(panel);
-      await new Promise(resolve => setTimeout(resolve, 500));
+    allComicGeneratingRef.current = true;
+    try {
+      for (const panel of pendingPanels) {
+        await generateComicPanelImage(panel);
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    } finally {
+      allComicGeneratingRef.current = false;
     }
   }, [comicPanels, comicSubjectImage, generateComicPanelImage]);
 
@@ -1052,7 +1060,7 @@ export function ImageToImagePanel() {
                     ))}
                   </div>
 
-                  <Button className="w-full gap-2" onClick={generateAllComicPanels} disabled={storyboardPendingCount === 0 || !comicSubjectImage || !hasModels}>
+                  <Button className="w-full gap-2" onClick={generateAllComicPanels} disabled={allComicGeneratingRef.current || storyboardPendingCount === 0 || !comicSubjectImage || !hasModels}>
                     <Play className="h-4 w-4" />
                     生成全部 ({storyboardPendingCount} 个待生成)
                   </Button>

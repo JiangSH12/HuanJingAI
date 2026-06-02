@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo, useEffect } from 'react';
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -156,6 +156,27 @@ export function TextToImagePanel() {
   // Helper to generate a unique task ID
   const generateTaskId = () => `img-task-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+  const persistWorks = useCallback(async (urls: string[], task: ImageTask, requestBody: Record<string, unknown>, creditsCost: number) => {
+    if (!user || urls.length === 0) return;
+    try {
+      await fetch('/api/works', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user.id,
+          type: 'image',
+          prompt: task.prompt,
+          negativePrompt: task.negativePrompt,
+          resultUrls: urls,
+          params: { aspectRatio, resolution, count: requestBody.count, guidanceScale },
+          model: requestBody.model,
+          modelLabel: task.modelLabel,
+          creditsCost,
+        }),
+      });
+    } catch { /* 非阻塞 */ }
+  }, [user, aspectRatio, resolution, guidanceScale]);
+
   // Execute image generation request
   const executeGeneration = useCallback(async (task: ImageTask, requestBody: Record<string, unknown>, credits: number) => {
     updateTask(task.id, { status: 'generating' });
@@ -192,6 +213,7 @@ export function TextToImagePanel() {
             params: { aspectRatio: task.negativePrompt, resolution, count, guidanceScale },
           });
         }
+        await persistWorks(data.images, task, requestBody, credits);
         // Record credits
         if (credits > 0 && user) {
           const currentCredits = typeof user.creditsBalance === 'number' ? user.creditsBalance : 0;
@@ -217,7 +239,7 @@ export function TextToImagePanel() {
       updateTask(task.id, { status: 'failed', error: errorMsg });
       toast.error(errorMsg);
     }
-  }, [updateTask, addRecord, user, resolution, count, guidanceScale]);
+  }, [updateTask, addRecord, persistWorks, user, resolution, count, guidanceScale]);
 
   // Generate
   const handleGenerate = useCallback(async () => {
@@ -312,6 +334,9 @@ export function TextToImagePanel() {
   }, [prompt, textModelOptions, getCurrentModelLabel]);
 
   const credits = calcImageCredits(selectedModel, resolution, aspectRatio, count);
+
+  // Prevent concurrent "generate all" calls
+  const allGeneratingRef = useRef(false);
 
   // ========== Storyboard Functions ==========
 
@@ -465,14 +490,20 @@ export function TextToImagePanel() {
 
   // Generate all pending panel images
   const generateAllPanels = useCallback(async () => {
+    if (allGeneratingRef.current) return;
     const pendingPanels = storyPanels.filter(p => p.status === 'pending' || p.status === 'failed');
     if (pendingPanels.length === 0) { toast.info('所有分镜已生成完毕'); return; }
     if (!user) { toast.error('请先登录'); return; }
 
-    for (const panel of pendingPanels) {
-      await generatePanelImage(panel);
-      // Small delay between requests to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 500));
+    allGeneratingRef.current = true;
+    try {
+      for (const panel of pendingPanels) {
+        await generatePanelImage(panel);
+        // Small delay between requests to avoid rate limiting
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    } finally {
+      allGeneratingRef.current = false;
     }
   }, [storyPanels, user, generatePanelImage]);
 
@@ -919,7 +950,7 @@ export function TextToImagePanel() {
                   <Button
                     className="w-full gap-2"
                     onClick={generateAllPanels}
-                    disabled={storyPanels.every(p => p.status === 'completed') || !hasModels}
+                    disabled={allGeneratingRef.current || storyPanels.every(p => p.status === 'completed') || !hasModels}
                   >
                     <Play className="h-4 w-4" />
                     生成全部 ({storyPanels.filter(p => p.status === 'pending' || p.status === 'failed').length}个待生成)
