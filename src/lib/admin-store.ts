@@ -178,8 +178,8 @@ const DEFAULT_CONFIG: AdminConfig = {
 
 // ---- Storage ----
 
-const STORAGE_KEY = 'miaojing_admin_config';
-const EVENT_KEY = 'miaojing_admin_updated';
+const STORAGE_KEY = 'huanjing-aigc_admin_config';
+const EVENT_KEY = 'huanjing-aigc_admin_updated';
 
 function getStoredConfig(): AdminConfig {
   if (typeof window === 'undefined') return DEFAULT_CONFIG;

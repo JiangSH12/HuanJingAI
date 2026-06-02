@@ -22,7 +22,7 @@ export interface CustomApiKey {
   createdAt: string;
 }
 
-const STORAGE_KEY = 'miaojing_custom_api_keys';
+const STORAGE_KEY = 'huanjing-aigc_custom_api_keys';
 
 function loadKeys(): CustomApiKey[] {
   if (typeof window === 'undefined') return [];

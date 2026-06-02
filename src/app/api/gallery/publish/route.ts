@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
     const workType = type === 'video' ? (body.referenceImage ? 'img2video' : 'text2video')
       : type === 'image' ? (body.referenceImage ? 'img2img' : 'text2img')
       : type;
+    const resolvedThumbnailUrl = thumbnailUrl || (workType === 'text2img' || workType === 'img2img' ? resultUrl : body.referenceImage || null);
 
     // Validate userId is a valid UUID, otherwise use default system user UUID
     const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -56,7 +57,7 @@ export async function POST(request: NextRequest) {
         prompt: prompt || null,
         negative_prompt: negativePrompt || null,
         result_url: resultUrl,
-        thumbnail_url: thumbnailUrl || null,
+        thumbnail_url: resolvedThumbnailUrl,
         width: width || null,
         height: height || null,
         duration: duration || null,

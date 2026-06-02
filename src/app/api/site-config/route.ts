@@ -18,8 +18,8 @@ export async function GET() {
   } catch {
     // Demo mode: return defaults
     return NextResponse.json({
-      siteName: '幻镜',
-      siteTabTitle: '幻镜 - AI创作平台',
+      siteName: '幻境AIGC',
+      siteTabTitle: '幻境AIGC',
       logoUrl: null,
       faviconUrl: null,
     });
@@ -33,8 +33,8 @@ export async function GET() {
 
   if (error || !data) {
     return NextResponse.json({
-      siteName: '幻镜',
-      siteTabTitle: '幻镜 - AI创作平台',
+      siteName: '幻境AIGC',
+      siteTabTitle: '幻境AIGC',
       logoUrl: null,
       faviconUrl: null,
     });

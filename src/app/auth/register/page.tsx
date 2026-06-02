@@ -60,7 +60,7 @@ export default function RegisterPage() {
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
               <Brush className="h-5 w-5" />
             </div>
-            <span className="font-serif text-2xl font-bold">幻镜</span>
+            <span className="font-serif text-2xl font-bold">幻境AIGC</span>
           </Link>
         </div>
 

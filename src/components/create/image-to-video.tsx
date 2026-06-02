@@ -301,7 +301,7 @@ export function ImageToVideoPanel() {
   }, [prompt, negativePrompt, selectedModel, aspectRatio, duration, cameraMovement, referenceImage, user, videoKeys, systemVideoApis, getCurrentModelLabel, executeGeneration]);
 
   const handleDownload = useCallback(async (url: string, index: number) => {
-    const result = await downloadFile(url, `miaojing-img2vid-${Date.now()}-${index}.mp4`);
+    const result = await downloadFile(url, `huanjing-aigc-img2vid-${Date.now()}-${index}.mp4`);
     if (!result.ok) toast.error(result.error || '下载失败');
   }, []);
 
@@ -316,9 +316,10 @@ export function ImageToVideoPanel() {
       prompt: prompt.trim(),
       model: selectedModel,
       modelLabel: getCurrentModelLabel(),
+      referenceImage: referencePreview || undefined,
     });
     toast.success('已分享到画廊');
-  }, [prompt, selectedModel, getCurrentModelLabel]);
+  }, [prompt, selectedModel, getCurrentModelLabel, referencePreview]);
 
   return (
     <div className="flex gap-6 min-h-[600px]">

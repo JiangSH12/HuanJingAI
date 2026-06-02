@@ -2006,7 +2006,7 @@ function SettingsTab() {
             <Input
               value={formSiteName}
               onChange={e => setFormSiteName(e.target.value)}
-              placeholder="幻镜"
+              placeholder="幻境AIGC"
             />
           </div>
 
@@ -2017,7 +2017,7 @@ function SettingsTab() {
             <Input
               value={formTabTitle}
               onChange={e => setFormTabTitle(e.target.value)}
-              placeholder="幻镜 - AI创作平台"
+              placeholder="幻境AIGC"
             />
           </div>
 
@@ -2163,7 +2163,7 @@ function DataManagementTab() {
       const link = document.createElement('a');
       const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
       link.href = url;
-      link.download = `miaojing-backup-${timestamp}.json`;
+      link.download = `huanjing-aigc-backup-${timestamp}.json`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

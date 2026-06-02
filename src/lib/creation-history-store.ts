@@ -39,8 +39,8 @@ export interface PublishedWork {
   likes: number;
 }
 
-const STORAGE_KEY = 'miaojing_creation_history';
-const PUBLISHED_KEY = 'miaojing_published_gallery';
+const STORAGE_KEY = 'huanjing-aigc_creation_history';
+const PUBLISHED_KEY = 'huanjing-aigc_published_gallery';
 const MAX_RECORDS = 200;
 const MAX_PUBLISHED = 200;
 // Max localStorage size for history data (3MB, leaving room for other stores)

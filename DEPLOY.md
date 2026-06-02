@@ -20,7 +20,7 @@
 
 ## 1. 项目概述
 
-妙境（MiaoJing）是一站式 AI 多模态创作平台，提供文生图、图生图、文生视频、图生视频四大核心能力，配套用户管理、积分系统、管理后台等完整功能。
+幻境AIGC是一站式 AI 多模态创作平台，提供文生图、图生图、文生视频、图生视频四大核心能力，配套用户管理、积分系统、管理后台等完整功能。
 
 **技术栈**: Next.js 16 + React 19 + TypeScript 5 + shadcn/ui + Tailwind CSS 4 + Supabase
 
@@ -184,8 +184,8 @@ COZE_MODEL_BASE_URL=https://model.coze.com
 #### 步骤 1: 获取源码
 
 ```bash
-git clone <your-repo-url> /opt/miaojing
-cd /opt/miaojing
+git clone <your-repo-url> /opt/huanjing-aigc
+cd /opt/huanjing-aigc
 ```
 
 #### 步骤 2: 配置环境变量
@@ -223,7 +223,7 @@ pnpm build
 pnpm start
 
 # 后台启动（生产推荐）
-nohup pnpm start > /var/log/miaojing/app.log 2>&1 &
+nohup pnpm start > /var/log/huanjing-aigc/app.log 2>&1 &
 ```
 
 默认监听端口 **5000**，可通过环境变量 `DEPLOY_RUN_PORT` 修改。
@@ -282,20 +282,20 @@ CMD ["node", "server.js"]
 #### 步骤 2: 构建镜像
 
 ```bash
-docker build -t miaojing:latest .
+docker build -t huanjing-aigc:latest .
 ```
 
 #### 步骤 3: 运行容器
 
 ```bash
 docker run -d \
-  --name miaojing \
+  --name huanjing-aigc \
   -p 5000:5000 \
   -e SUPABASE_URL=https://xxxxx.supabase.co \
   -e SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIs... \
   -e SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIs... \
   --restart unless-stopped \
-  miaojing:latest
+  huanjing-aigc:latest
 ```
 
 ### 方式三：Nginx 反向代理 + PM2 守护进程
@@ -315,10 +315,10 @@ npm install -g pm2
 ```javascript
 module.exports = {
   apps: [{
-    name: 'miaojing',
+    name: 'huanjing-aigc',
     script: 'pnpm',
     args: 'start',
-    cwd: '/opt/miaojing',
+    cwd: '/opt/huanjing-aigc',
     env: {
       NODE_ENV: 'production',
       PORT: 5000,
@@ -326,8 +326,8 @@ module.exports = {
     instances: 1,
     autorestart: true,
     max_memory_restart: '1G',
-    error_file: '/var/log/miaojing/error.log',
-    out_file: '/var/log/miaojing/out.log',
+    error_file: '/var/log/huanjing-aigc/error.log',
+    out_file: '/var/log/huanjing-aigc/out.log',
   }],
 };
 ```
@@ -389,10 +389,10 @@ sudo certbot --nginx -d your-domain.com
 
 | 数据类型 | 保存位置 | 说明 |
 |----------|----------|------|
-| 应用源码 | `/opt/miaojing` | Git 仓库 |
-| 构建产物 | `/opt/miaojing/.next/` | Next.js 编译输出 |
-| 环境变量 | `/opt/miaojing/.env.local` | ⚠️ 敏感信息，不要提交到 Git |
-| 运行日志 | `/var/log/miaojing/` | PM2/Nohup 输出 |
+| 应用源码 | `/opt/huanjing-aigc` | Git 仓库 |
+| 构建产物 | `/opt/huanjing-aigc/.next/` | Next.js 编译输出 |
+| 环境变量 | `/opt/huanjing-aigc/.env.local` | ⚠️ 敏感信息，不要提交到 Git |
+| 运行日志 | `/var/log/huanjing-aigc/` | PM2/Nohup 输出 |
 | 用户数据 | Supabase (云端) | profiles, works, orders 等 |
 | 用户上传 | Supabase Storage (云端) | Logo, Favicon, 作品 |
 | 生成文件 | S3 兼容对象存储 | AI 生成的图片/视频 |
@@ -476,7 +476,7 @@ pnpm build
 
 1. 检查端口是否被占用：`ss -tuln | grep 5000`
 2. 检查防火墙：`sudo ufw status`
-3. 检查日志：`tail -50 /var/log/miaojing/error.log`
+3. 检查日志：`tail -50 /var/log/huanjing-aigc/error.log`
 
 ### Q: 登录返回 Demo 模式
 
@@ -509,17 +509,17 @@ pnpm build
 ## 11. 更新部署
 
 ```bash
-cd /opt/miaojing
+cd /opt/huanjing-aigc
 git pull origin main
 pnpm install
 pnpm build
 
 # PM2 方式
-pm2 restart miaojing
+pm2 restart huanjing-aigc
 
 # Nohup 方式
 kill $(lsof -t -i:5000) 2>/dev/null
-nohup pnpm start > /var/log/miaojing/app.log 2>&1 &
+nohup pnpm start > /var/log/huanjing-aigc/app.log 2>&1 &
 ```
 
 ---

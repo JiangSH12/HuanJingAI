@@ -515,7 +515,7 @@ export function TextToImagePanel() {
 
   // Download
   const handleDownload = useCallback(async (url: string, index: number) => {
-    const result = await downloadFile(url, `miaojing-${Date.now()}-${index}.png`);
+    const result = await downloadFile(url, `huanjing-aigc-${Date.now()}-${index}.png`);
     if (!result.ok) toast.error(result.error || '下载失败');
   }, []);
 

@@ -17,8 +17,8 @@ export interface OrderRecord {
   userName?: string;
 }
 
-const STORAGE_KEY = 'miaojing_orders';
-const ADMIN_STORAGE_KEY = 'miaojing_admin_orders';
+const STORAGE_KEY = 'huanjing-aigc_orders';
+const ADMIN_STORAGE_KEY = 'huanjing-aigc_admin_orders';
 const MAX_RECORDS = 500;
 
 function loadRecords(key: string): OrderRecord[] {

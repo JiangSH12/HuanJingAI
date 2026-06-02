@@ -44,7 +44,7 @@ export function CreationDetailDialog({ record, open, onClose, onPublishChange }:
     }
 
     const ext = record.type === 'video' ? 'mp4' : 'png';
-    const filename = `miaojing-${Date.now()}.${ext}`;
+    const filename = `huanjing-aigc-${Date.now()}.${ext}`;
     const result = await downloadFile(url, filename);
     if (result.ok) {
       toast.success('下载成功');

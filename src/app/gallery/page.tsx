@@ -75,6 +75,23 @@ function getCategoryLabel(work: GalleryWork): string {
   return cat?.label ?? work.type;
 }
 
+function isVideoWork(work: GalleryWork): boolean {
+  return work.type === 'video' || work.type === 'text2video' || work.type === 'img2video' || Boolean(work.duration);
+}
+
+function getPreviewUrl(work: GalleryWork): string | null {
+  if (work.thumbnailUrl && !work.thumbnailUrl.startsWith('[')) {
+    return work.thumbnailUrl;
+  }
+  if (!isVideoWork(work) && work.url && !work.url.startsWith('[')) {
+    return work.url;
+  }
+  if (work.referenceImage && !work.referenceImage.startsWith('[')) {
+    return work.referenceImage;
+  }
+  return null;
+}
+
 function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString('zh-CN', {
@@ -166,7 +183,7 @@ export default function GalleryPage() {
         prompt: w.prompt,
         negativePrompt: w.negativePrompt,
         url: w.url,
-        thumbnailUrl: null,
+        thumbnailUrl: w.type === 'image' ? w.url : w.referenceImage || null,
         width: null,
         height: null,
         duration: null,
@@ -189,7 +206,7 @@ export default function GalleryPage() {
         prompt: r.prompt,
         negativePrompt: r.negativePrompt,
         url: r.url,
-        thumbnailUrl: null,
+        thumbnailUrl: r.type === 'image' ? r.url : r.referenceImage || null,
         width: null,
         height: null,
         duration: null,
@@ -305,45 +322,39 @@ export default function GalleryPage() {
           </div>
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
-            {filteredWorks.map((work) => (
+            {filteredWorks.map((work) => {
+              const previewUrl = getPreviewUrl(work);
+              const video = isVideoWork(work);
+
+              return (
               <div
                 key={work.id}
                 className="group overflow-hidden rounded-xl border border-border/40 bg-card hover:border-foreground/10 hover:shadow-sm transition-all duration-300 cursor-pointer"
                 onClick={() => setSelectedWork(work)}
               >
                 <div className="relative aspect-square bg-muted">
-                  {work.thumbnailUrl ? (
+                  {previewUrl ? (
                     <img
-                      src={work.thumbnailUrl}
+                      src={previewUrl}
                       alt={(work.prompt || '').slice(0, 30)}
                       className="w-full h-full object-cover"
                       loading="lazy"
                       onDoubleClick={(e) => { e.stopPropagation(); setFullscreenSrc(work.url); }}
                     />
-                  ) : work.url && !work.url.startsWith('data:') ? (
-                    (work.type === 'video' || work.type === 'text2video' || work.type === 'img2video') ? (
-                      <video
-                        src={work.url}
-                        muted
-                        preload="metadata"
-                        className="w-full h-full object-cover"
-                        onDoubleClick={(e) => { e.stopPropagation(); setFullscreenSrc(work.url); }}
-                      />
-                    ) : (
-                      <img
-                        src={work.url}
-                        alt={(work.prompt || '').slice(0, 30)}
-                        className="w-full h-full object-cover"
-                        loading="lazy"
-                        onDoubleClick={(e) => { e.stopPropagation(); setFullscreenSrc(work.url); }}
-                      />
-                    )
+                  ) : work.url && !work.url.startsWith('data:') && video ? (
+                    <video
+                      src={work.url}
+                      muted
+                      preload="metadata"
+                      className="w-full h-full object-cover"
+                      onDoubleClick={(e) => { e.stopPropagation(); setFullscreenSrc(work.url); }}
+                    />
                   ) : (
                     <div className="w-full h-full flex flex-col items-center justify-center bg-muted">
                       <Sparkles className="h-6 w-6 text-muted-foreground/15" />
                     </div>
                   )}
-                  {(work.type === 'video' || work.type === 'text2video' || work.type === 'img2video') && (
+                  {video && (
                     <span className="absolute top-2 left-2 px-2 py-0.5 text-[10px] bg-background/80 backdrop-blur-sm rounded-full text-foreground/70">
                       视频
                     </span>
@@ -365,7 +376,7 @@ export default function GalleryPage() {
                       </button>
                       <button
                         className="h-7 w-7 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center hover:bg-white/30 transition-colors"
-                        onClick={(e) => handleDownload(work.url, `huanjing-${work.id}.png`, e)}
+                        onClick={(e) => handleDownload(work.url, `huanjing-aigc-${work.id}.png`, e)}
                       >
                         <Download className="h-3.5 w-3.5 text-white" />
                       </button>
@@ -387,7 +398,8 @@ export default function GalleryPage() {
                   </p>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
@@ -473,7 +485,7 @@ export default function GalleryPage() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => handleDownload(selectedWork.url, `miaojing-${selectedWork.id}.png`)}
+                    onClick={() => handleDownload(selectedWork.url, `huanjing-aigc-${selectedWork.id}.png`)}
                   >
                     <Download className="h-4 w-4 mr-1" />
                     下载

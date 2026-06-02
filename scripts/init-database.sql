@@ -1,5 +1,5 @@
 -- ============================================================
--- 妙境 AI 创作平台 — 数据库初始化脚本
+-- 幻境AIGC — 数据库初始化脚本
 -- 适用于: PostgreSQL 14+ (Supabase / 自托管)
 -- 执行方式: 在 Supabase SQL Editor 或 psql 中运行
 -- ============================================================
@@ -142,8 +142,8 @@ CREATE UNIQUE INDEX IF NOT EXISTS work_likes_user_work_uniq ON work_likes (user_
 -- ============================================================
 CREATE TABLE IF NOT EXISTS site_config (
   id INTEGER PRIMARY KEY DEFAULT 1,
-  site_name VARCHAR(128) NOT NULL DEFAULT '妙境',
-  site_tab_title VARCHAR(255) NOT NULL DEFAULT '妙境 - AI创作平台',
+  site_name VARCHAR(128) NOT NULL DEFAULT '幻境AIGC',
+  site_tab_title VARCHAR(255) NOT NULL DEFAULT '幻境AIGC',
   logo_url TEXT,
   favicon_url TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
@@ -152,7 +152,7 @@ CREATE TABLE IF NOT EXISTS site_config (
 
 -- 插入默认配置
 INSERT INTO site_config (id, site_name, site_tab_title)
-VALUES (1, '妙境', '妙境 - AI创作平台')
+VALUES (1, '幻境AIGC', '幻境AIGC')
 ON CONFLICT (id) DO NOTHING;
 
 -- ============================================================

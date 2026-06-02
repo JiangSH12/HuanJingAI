@@ -593,7 +593,7 @@ export function ImageToImagePanel() {
   }, [comicPanels, comicSubjectImage, generateComicPanelImage]);
 
   const handleDownload = useCallback(async (url: string, index: number) => {
-    const result = await downloadFile(url, `miaojing-img2img-${Date.now()}-${index}.png`);
+    const result = await downloadFile(url, `huanjing-aigc-img2img-${Date.now()}-${index}.png`);
     if (!result.ok) toast.error(result.error || '下载失败');
   }, []);
 

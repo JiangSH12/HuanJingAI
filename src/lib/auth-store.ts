@@ -28,8 +28,8 @@ export interface AuthState {
   isLoggedIn: boolean;
 }
 
-const STORAGE_KEY = 'miaojing_auth';
-const EVENT_KEY = 'miaojing_auth_updated';
+const STORAGE_KEY = 'huanjing-aigc_auth';
+const EVENT_KEY = 'huanjing-aigc_auth_updated';
 
 function getStoredAuth(): AuthState {
   if (typeof window === 'undefined') {

@@ -3,7 +3,7 @@ import { getSupabaseClient } from '@/storage/database/supabase-client';
 
 const DEFAULT_ADMIN_NICKNAME = 'admin';
 const DEFAULT_ADMIN_PASSWORD = process.env.ADMIN_DEFAULT_PASSWORD || 'admin123';
-const DEFAULT_ADMIN_EMAIL = 'admin@miaojing.local';
+const DEFAULT_ADMIN_EMAIL = 'admin@huanjing-aigc.local';
 
 /**
  * GET /api/auth/admin-exists — check if any admin account exists

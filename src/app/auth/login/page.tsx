@@ -106,7 +106,7 @@ export default function AuthPage() {
         {/* Logo */}
         <div className="text-center mb-10">
           <Link href="/" className="inline-flex items-center gap-2">
-            <span className="font-serif text-2xl font-light text-foreground">幻镜</span>
+            <span className="font-serif text-2xl font-light text-foreground">幻境AIGC</span>
           </Link>
           <p className="mt-2 text-xs text-muted-foreground font-light">AI 创作平台</p>
         </div>

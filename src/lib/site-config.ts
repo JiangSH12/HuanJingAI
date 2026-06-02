@@ -10,13 +10,13 @@ export interface SiteConfig {
 }
 
 const DEFAULT_SITE_CONFIG: SiteConfig = {
-  siteName: '幻镜',
-  siteTabTitle: '幻镜 - AI创作平台',
+  siteName: '幻境AIGC',
+  siteTabTitle: '幻境AIGC',
   logoUrl: null,
   faviconUrl: null,
 };
 
-const CACHE_KEY = 'miaojing_site_config_cache';
+const CACHE_KEY = 'huanjing-aigc_site_config_cache';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface CachedConfig {

@@ -1,7 +1,7 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 /**
- * Supabase client for the MiaoJing AI Creation Platform.
+ * Supabase client for the Huanjing AIGC Platform.
  *
  * Required environment variables:
  * - SUPABASE_URL: Supabase project URL

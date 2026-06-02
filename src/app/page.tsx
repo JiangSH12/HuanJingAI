@@ -95,7 +95,7 @@ export default function HomePage() {
       <section className="relative flex flex-col items-center justify-center min-h-[85vh] px-4">
         <div className="text-center">
           <h1 className="font-serif text-5xl sm:text-6xl lg:text-7xl font-light tracking-tight text-foreground">
-            幻镜<span className="font-normal">AIGC</span>
+            幻境<span className="font-normal">AIGC</span>
           </h1>
 
           <p className="mt-8 mx-auto max-w-lg text-base text-muted-foreground leading-relaxed font-light">
@@ -182,7 +182,7 @@ export default function HomePage() {
       <section className="py-20 bg-muted/30">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <div className="text-center mb-12">
-            <h2 className="font-serif text-2xl sm:text-3xl font-light text-foreground">为什么选择幻镜</h2>
+            <h2 className="font-serif text-2xl sm:text-3xl font-light text-foreground">为什么选择幻境AIGC</h2>
           </div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-8">

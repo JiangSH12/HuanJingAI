@@ -59,7 +59,7 @@ export function Navbar() {
         {/* Logo */}
         <Link href="/" className="flex items-center gap-2 group">
           <span className="font-serif text-lg font-medium tracking-wide text-foreground">
-            {siteLoaded ? (siteConfig.siteName || '幻镜') : '幻镜'}
+            {siteLoaded ? (siteConfig.siteName || '幻境AIGC') : '幻境AIGC'}
           </span>
         </Link>
 

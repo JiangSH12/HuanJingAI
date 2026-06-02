@@ -48,9 +48,9 @@ export async function POST(request: NextRequest) {
     const body: ImportPayload = await request.json();
     const { _meta, data, options = {} } = body;
 
-    if (!_meta || !_meta.platform || _meta.platform !== 'miaojing') {
+    if (!_meta || !_meta.platform || _meta.platform !== 'huanjing-aigc') {
       return NextResponse.json(
-        { error: '无效的导入文件：格式不匹配（必须为幻镜平台导出文件）' },
+        { error: '无效的导入文件：格式不匹配（必须为幻境AIGC平台导出文件）' },
         { status: 400 }
       );
     }

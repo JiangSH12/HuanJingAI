@@ -292,7 +292,7 @@ export function TextToVideoPanel() {
   }, [prompt, negativePrompt, selectedModel, aspectRatio, duration, cameraMovement, style, user, videoKeys, systemVideoApis, getCurrentModelLabel, executeGeneration]);
 
   const handleDownload = useCallback(async (url: string, index: number) => {
-    const result = await downloadFile(url, `miaojing-video-${Date.now()}-${index}.mp4`);
+    const result = await downloadFile(url, `huanjing-aigc-video-${Date.now()}-${index}.mp4`);
     if (!result.ok) toast.error(result.error || '下载失败');
   }, []);
 

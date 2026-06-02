@@ -43,7 +43,7 @@ export function ImageLightbox({ src, alt, open, onClose }: LightboxProps) {
   if (!open) return null;
 
   const handleDownload = async () => {
-    const result = await downloadFile(src, `miaojing-${Date.now()}.png`);
+    const result = await downloadFile(src, `huanjing-aigc-${Date.now()}.png`);
     if (!result.ok) {
       // Fallback: open in new tab
       window.open(src, '_blank');

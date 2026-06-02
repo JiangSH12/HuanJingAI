@@ -19,7 +19,7 @@ export interface CreditRecord {
   createdAt: string;       // ISO string，显示时精确到分钟
 }
 
-const STORAGE_KEY = 'miaojing_credit_records';
+const STORAGE_KEY = 'huanjing-aigc_credit_records';
 const MAX_RECORDS = 500;
 
 function loadRecords(): CreditRecord[] {

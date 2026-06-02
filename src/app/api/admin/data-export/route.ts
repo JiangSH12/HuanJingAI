@@ -90,7 +90,7 @@ export async function GET() {
     const exportData = {
       _meta: {
         version: '1.0',
-        platform: 'miaojing',
+        platform: 'huanjing-aigc',
         exported_at: new Date().toISOString(),
         tables: Object.keys(data),
         counts: Object.fromEntries(Object.entries(data).map(([k, v]) => [k, v.length])),

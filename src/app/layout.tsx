@@ -9,8 +9,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: '幻镜 - AI创作平台',
-    template: '%s | 幻镜',
+    default: '幻境AIGC',
+    template: '%s | 幻境AIGC',
   },
   description: '妙手丹青，境随心造 - 一站式AI多模态创作平台，提供文生图、图生图、文生视频、图生视频四大核心能力',
   icons: {
@@ -18,7 +18,7 @@ export const metadata: Metadata = {
     apple: '/apple-touch-icon.png',
   },
   keywords: [
-    '幻镜',
+    '幻境AIGC',
     'AI创作',
     '文生图',
     '图生图',

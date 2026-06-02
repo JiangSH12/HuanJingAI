@@ -52,7 +52,7 @@ import { SmartApiConfigDialog } from '@/components/smart-api-config-dialog';
 // Mock data for demo - in production, fetch from API
 const mockProfile = {
   nickname: '创作者',
-  email: 'creator@miaojing.ai',
+  email: 'creator@huanjing-aigc.ai',
   phone: '138****8888',
   role: 'user',
   membership_tier: 'free',
